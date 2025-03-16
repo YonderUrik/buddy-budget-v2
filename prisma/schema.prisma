@@ -1,0 +1,393 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+// Modelli di Dati
+
+model User {
+  id                     String                  @id @default(auto()) @map("_id") @db.ObjectId
+  name                   String
+  email                  String                  @unique
+  password               String // Hashed password
+  settings               Json? // Theme, language, notifications, etc.
+  primaryCurrency        String                  @default("EUR")
+  isActive               Boolean                 @default(true)
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  hasCompletedOnboarding Boolean                 @default(false)
+  // Relazioni
+  liquidityAccounts      LiquidityAccount[]
+  transactions           Transaction[]
+  categories             Category[]
+  recurringTransactions  RecurringTransaction[]
+  budgets                Budget[]
+  investments            Investment[]
+  mortgages              Mortgage[]
+  wealthSnapshots        WealthSnapshot[]
+  investmentTransactions InvestmentTransaction[]
+  passwordResetTokens    PasswordResetToken[]
+}
+
+model LiquidityAccount {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String    @db.ObjectId
+  name      String
+  type      String // "checking", "savings", "cash", "other"
+  balance   Float
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+
+  // Relazioni
+  user                  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions          Transaction[]
+  recurringTransactions RecurringTransaction[]
+  assetValuations       AssetValuation[]
+}
+
+model Transaction {
+  id              String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId          String    @db.ObjectId
+  accountId       String    @db.ObjectId
+  date            DateTime
+  amount          Float
+  currency        String    @default("EUR")
+  convertedAmount Float? // Importo nella valuta primaria dell'utente
+  type            String // "income", "expense", "transfer"
+  categoryId      String?   @db.ObjectId
+  description     String?
+  isRecurring     Boolean   @default(false)
+  recurringId     String?   @db.ObjectId
+  budgetId        String?   @db.ObjectId
+  tags            String[]
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  isDeleted       Boolean   @default(false)
+  deletedAt       DateTime?
+
+  // Relazioni
+  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account              LiquidityAccount      @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  category             Category?             @relation(fields: [categoryId], references: [id])
+  recurringTransaction RecurringTransaction? @relation(fields: [recurringId], references: [id])
+  budget               Budget?               @relation(fields: [budgetId], references: [id])
+}
+
+model Category {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String    @db.ObjectId
+  name      String
+  type      String // "income", "expense"
+  icon      String?
+  color     String?
+  parentId  String?   @db.ObjectId
+  level     Int       @default(0)
+  order     Int       @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+
+  // Relazioni
+  user                  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent                Category?              @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children              Category[]             @relation("CategoryHierarchy")
+  transactions          Transaction[]
+  recurringTransactions RecurringTransaction[]
+  budgetCategories      BudgetCategory[]
+}
+
+model RecurringTransaction {
+  id             String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId         String    @db.ObjectId
+  accountId      String    @db.ObjectId
+  amount         Float
+  currency       String    @default("EUR")
+  categoryId     String?   @db.ObjectId
+  frequency      String // "daily", "weekly", "biweekly", "monthly", "quarterly", "yearly"
+  startDate      DateTime
+  endDate        DateTime?
+  description    String?
+  lastProcessed  DateTime?
+  nextOccurrence DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  isActive       Boolean   @default(true)
+  isDeleted      Boolean   @default(false)
+  deletedAt      DateTime?
+
+  // Relazioni
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account      LiquidityAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  category     Category?        @relation(fields: [categoryId], references: [id])
+  transactions Transaction[]
+}
+
+model Budget {
+  id                   String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId               String    @db.ObjectId
+  name                 String
+  amount               Float
+  currency             String    @default("EUR")
+  period               String // "daily", "weekly", "monthly", "yearly"
+  startDate            DateTime
+  endDate              DateTime?
+  includeSubcategories Boolean   @default(true)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  isActive             Boolean   @default(true)
+  isDeleted            Boolean   @default(false)
+  deletedAt            DateTime?
+
+  // Relazioni
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  budgetCategories BudgetCategory[]
+  transactions     Transaction[]
+}
+
+// Modello di relazione molti-a-molti tra Budget e Category
+model BudgetCategory {
+  id         String @id @default(auto()) @map("_id") @db.ObjectId
+  budgetId   String @db.ObjectId
+  categoryId String @db.ObjectId
+
+  // Relazioni
+  budget   Budget   @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([budgetId, categoryId])
+}
+
+model Investment {
+  id                   String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId               String    @db.ObjectId
+  name                 String
+  type                 String // "market", "crypto", "retirement", "real_estate"
+  acquisitionDate      DateTime
+  acquisitionValue     Float
+  acquisitionCurrency  String
+  currentValue         Float
+  currentValueCurrency String
+  notes                String?
+  isActive             Boolean   @default(true)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  isDeleted            Boolean   @default(false)
+  deletedAt            DateTime?
+
+  // Relazioni
+  user                   User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  marketInvestment       MarketInvestment?
+  cryptoInvestment       CryptoInvestment?
+  retirementInvestment   RetirementInvestment?
+  realEstateInvestment   RealEstateInvestment?
+  assetValuations        AssetValuation[]
+  investmentTransactions InvestmentTransaction[]
+}
+
+model MarketInvestment {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  investmentId  String    @unique @db.ObjectId
+  assetType     String // "stock", "bond", "etf", "fund", "commodity", "other"
+  ticker        String?
+  quantity      Float
+  purchasePrice Float
+  currentPrice  Float
+  currency      String
+  broker        String?
+  dividendYield Float?
+  sector        String?
+  performance   Json? // { roi: Float, annualizedReturn: Float }
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  isDeleted     Boolean   @default(false)
+  deletedAt     DateTime?
+
+  // Relazioni
+  investment Investment @relation(fields: [investmentId], references: [id], onDelete: Cascade)
+}
+
+model CryptoInvestment {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  investmentId  String    @unique @db.ObjectId
+  cryptoName    String
+  ticker        String
+  quantity      Float
+  purchasePrice Float
+  currentPrice  Float
+  currency      String
+  wallet        String?
+  exchange      String?
+  performance   Json? // { roi: Float, annualizedReturn: Float }
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  isDeleted     Boolean   @default(false)
+  deletedAt     DateTime?
+
+  // Relazioni
+  investment Investment @relation(fields: [investmentId], references: [id], onDelete: Cascade)
+}
+
+model RetirementInvestment {
+  id                 String    @id @default(auto()) @map("_id") @db.ObjectId
+  investmentId       String    @unique @db.ObjectId
+  accountType        String
+  provider           String
+  contributionType   String // "personal", "employer", "mixed"
+  taxAdvantaged      Boolean   @default(false)
+  withdrawalDate     DateTime?
+  allocationStrategy String?
+  currency           String
+  performance        Json? // { roi: Float, annualizedReturn: Float }
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  isDeleted          Boolean   @default(false)
+  deletedAt          DateTime?
+
+  // Relazioni
+  investment Investment @relation(fields: [investmentId], references: [id], onDelete: Cascade)
+}
+
+model RealEstateInvestment {
+  id               String    @id @default(auto()) @map("_id") @db.ObjectId
+  investmentId     String    @unique @db.ObjectId
+  propertyType     String // "residential", "commercial", "land", "other"
+  address          Json // { street, city, state, zipCode, country }
+  size             Float? // in metri quadri
+  acquisitionCosts Float? // spese notarili, tasse, ecc.
+  currency         String
+  rentalIncome     Float? // mensile se affittato
+  expenses         Float? // spese di manutenzione, tasse, ecc.
+  mortgageId       String?   @db.ObjectId
+  performance      Json? // { roi: Float, annualizedReturn: Float, rentalYield: Float }
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  isDeleted        Boolean   @default(false)
+  deletedAt        DateTime?
+
+  // Relazioni
+  investment Investment @relation(fields: [investmentId], references: [id], onDelete: Cascade)
+  mortgage   Mortgage?  @relation(fields: [mortgageId], references: [id])
+}
+
+model Mortgage {
+  id                String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String    @db.ObjectId
+  lender            String
+  originalAmount    Float
+  currency          String
+  outstandingAmount Float
+  interestRate      Float
+  startDate         DateTime
+  endDate           DateTime
+  paymentAmount     Float
+  paymentFrequency  String // "monthly", "biweekly", "weekly"
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  isActive          Boolean   @default(true)
+  isDeleted         Boolean   @default(false)
+  deletedAt         DateTime?
+
+  // Relazioni
+  user                  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  realEstateInvestments RealEstateInvestment[]
+}
+
+model InvestmentTransaction {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId       String   @db.ObjectId
+  investmentId String   @db.ObjectId
+  type         String // "buy", "sell", "dividend", "interest", "staking", "reward", "transfer", "swap", "fee", "other"
+  date         DateTime
+  quantity     Float? // quantità acquistata, venduta o ricevuta
+  pricePerUnit Float? // prezzo per unità
+  amount       Float // importo totale
+  fee          Float? // commissione pagata
+  fromCurrency String? // valuta di origine per swap o trasferimenti
+  toCurrency   String? // valuta di destinazione per swap o trasferimenti
+  fromWallet   String? // portafoglio/broker di origine per trasferimenti
+  toWallet     String? // portafoglio/broker di destinazione per trasferimenti
+  status       String   @default("completed") // "pending", "completed", "failed", "cancelled"
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  attachments  String[]
+  taxYear      Int? // anno fiscale di riferimento
+  taxable      Boolean  @default(true)
+  taxReported  Boolean  @default(false)
+
+  // Relazioni
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  investment Investment @relation(fields: [investmentId], references: [id], onDelete: Cascade)
+}
+
+model AssetValuation {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  assetId   String    @db.ObjectId
+  assetType String // "liquidity", "market", "crypto", "retirement", "real_estate"
+  date      DateTime
+  value     Float
+  currency  String
+  createdAt DateTime  @default(now())
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+
+  // Relazioni polymorphic - solo una di queste sarà usata
+  liquidityAccount LiquidityAccount? @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  investment       Investment?       @relation(fields: [assetId], references: [id], onDelete: Cascade)
+}
+
+model WealthSnapshot {
+  id                         String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId                     String    @db.ObjectId
+  date                       DateTime
+  currency                   String // valuta di riferimento per lo snapshot
+  liquidityTotal             Float
+  marketInvestmentsTotal     Float
+  cryptoInvestmentsTotal     Float
+  retirementInvestmentsTotal Float
+  realEstateInvestmentsTotal Float
+  liabilitiesTotal           Float
+  netWorth                   Float
+  createdAt                  DateTime  @default(now())
+  isDeleted                  Boolean   @default(false)
+  deletedAt                  DateTime?
+
+  // Relazioni
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ExchangeRate {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  fromCurrency String
+  toCurrency   String
+  rate         Float
+  date         DateTime
+  source       String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([fromCurrency, toCurrency, date])
+}
+
+// Modello per i token di reset della password
+model PasswordResetToken {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  token     String   @unique
+  expires   DateTime
+  createdAt DateTime @default(now())
+
+  // Relazioni
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
