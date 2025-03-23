@@ -153,7 +153,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <SidebarMenu>
               {data.nav.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton tooltip={item.title} asChild isActive={isCurrentUrl(item.path, true)}>
+                  <SidebarMenuButton tooltip={item.title} asChild isActive={isCurrentUrl(item.path)}>
                     <a href={item.path}>
                       {item.icon && <item.icon />}
                       <span>{item.title}</span>
