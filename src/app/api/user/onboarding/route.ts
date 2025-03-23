@@ -34,13 +34,16 @@ export async function POST(request: Request) {
   try {
     // Verifica l'autenticazione dell'utente
     const session = await getServerSession(authOptions);
-    
+
+
     if (!session?.user?.email) {
       return NextResponse.json(
         { message: "Non autorizzato" },
         { status: 401 }
       );
     }
+
+    const userId = session.user.id
 
     // Ottieni i dati dalla richiesta
     const body = await request.json();
@@ -77,14 +80,93 @@ export async function POST(request: Request) {
 
     // Crea gli account di liquidità
     for (const account of liquidityAccounts) {
-      await prisma.liquidityAccount.create({
-        data: {
-          userId: user.id,
-          name: account.name,
-          type: account.type,
-          balance: account.balance,
-        },
-      });
+      await prisma.$transaction(async (tx) => {
+        const createdAccount = await prisma.liquidityAccount.create({
+          data: {
+            userId: user.id,
+            name: account.name,
+            type: account.type,
+            balance: account.balance,
+          },
+        });
+
+        // Create an AssetValuation record for the new account
+        await tx.assetValuation.create({
+          data: {
+            assetId: createdAccount.id,
+            assetType: 'liquidity',
+            date: new Date(),
+            value: account.balance,
+            currency: primaryCurrency,
+            createdAt: new Date(),
+            isDeleted: false,
+          },
+        });
+
+        // Update or create WealthSnapshot
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // Reset to beginning of day for consistent snapshots
+
+        // Get existing snapshot for today
+        const existingSnapshot = await tx.wealthSnapshot.findFirst({
+          where: {
+            userId,
+            date: {
+              gte: today,
+              lt: new Date(today.getTime() + 24 * 60 * 60 * 1000), // Next day
+            },
+          },
+        });
+
+        // Calculate total liquidity
+        const liquidityAccounts = await tx.liquidityAccount.findMany({
+          where: {
+            userId,
+            isDeleted: false,
+          },
+        });
+
+        const liquidityTotal = liquidityAccounts.reduce(
+          (sum, acc) => sum + acc.balance,
+          0
+        );
+
+        if (existingSnapshot) {
+          // Update existing snapshot
+          await tx.wealthSnapshot.update({
+            where: { id: existingSnapshot.id },
+            data: {
+              liquidityTotal,
+              netWorth:
+                liquidityTotal +
+                existingSnapshot.marketInvestmentsTotal +
+                existingSnapshot.cryptoInvestmentsTotal +
+                existingSnapshot.retirementInvestmentsTotal +
+                existingSnapshot.realEstateInvestmentsTotal -
+                existingSnapshot.liabilitiesTotal,
+            },
+          });
+        } else {
+          // Create new snapshot
+          await tx.wealthSnapshot.create({
+            data: {
+              userId,
+              date: today,
+              currency: primaryCurrency,
+              liquidityTotal,
+              marketInvestmentsTotal: 0,
+              cryptoInvestmentsTotal: 0,
+              retirementInvestmentsTotal: 0,
+              realEstateInvestmentsTotal: 0,
+              liabilitiesTotal: 0,
+              netWorth: liquidityTotal, // Initially just the liquidity
+              createdAt: new Date(),
+              isDeleted: false,
+            },
+          });
+        }
+
+      })
     }
 
     // Crea le categorie personalizzate se fornite
@@ -101,7 +183,7 @@ export async function POST(request: Request) {
             level: 0,
           },
         });
-        
+
         // Crea le sottocategorie se presenti
         if (category.subcategories && category.subcategories.length > 0) {
           for (const subcategory of category.subcategories) {
@@ -119,9 +201,9 @@ export async function POST(request: Request) {
           }
         }
       }
-   } else {
+    } else {
       console.warn("No categories provided")
-   }
+    }
 
 
     return NextResponse.json(
@@ -130,14 +212,14 @@ export async function POST(request: Request) {
     );
   } catch (error) {
     console.error("Errore durante l'onboarding:", error);
-    
+
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { message: "Dati di onboarding non validi", errors: error.errors },
         { status: 400 }
       );
     }
-    
+
     return NextResponse.json(
       { message: "Si è verificato un errore durante l'onboarding" },
       { status: 500 }

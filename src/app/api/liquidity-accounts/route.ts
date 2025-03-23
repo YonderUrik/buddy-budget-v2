@@ -46,16 +46,98 @@ export async function POST(request: NextRequest) {
     }
 
     const userId = session.user.id;
+    const primaryCurrency = session.user.primaryCurrency
     const data = await request.json();
 
     // Override userId with the authenticated user's ID
     data.userId = userId;
 
-    const account = await prisma.liquidityAccount.create({
-      data,
+    // Use a transaction to ensure data consistency across related operations
+    const result = await prisma.$transaction(async (tx) => {
+      // Create the liquidity account
+      const account = await tx.liquidityAccount.create({
+        data,
+      });
+
+      // Create an AssetValuation record for the new account
+      await tx.assetValuation.create({
+        data: {
+          assetId: account.id,
+          assetType: 'liquidity',
+          date: new Date(),
+          value: account.balance,
+          currency: primaryCurrency,
+          createdAt: new Date(),
+          isDeleted: false,
+        },
+      });
+
+      // Update or create WealthSnapshot
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Reset to beginning of day for consistent snapshots
+
+      // Get existing snapshot for today
+      const existingSnapshot = await tx.wealthSnapshot.findFirst({
+        where: {
+          userId,
+          date: {
+            gte: today,
+            lt: new Date(today.getTime() + 24 * 60 * 60 * 1000), // Next day
+          },
+        },
+      });
+
+      // Calculate total liquidity
+      const liquidityAccounts = await tx.liquidityAccount.findMany({
+        where: {
+          userId,
+          isDeleted: false,
+        },
+      });
+      const liquidityTotal = liquidityAccounts.reduce(
+        (sum, acc) => sum + acc.balance,
+        0
+      );
+
+      if (existingSnapshot) {
+        // Update existing snapshot
+        await tx.wealthSnapshot.update({
+          where: { id: existingSnapshot.id },
+          data: {
+            liquidityTotal,
+            netWorth:
+              liquidityTotal +
+              existingSnapshot.marketInvestmentsTotal +
+              existingSnapshot.cryptoInvestmentsTotal +
+              existingSnapshot.retirementInvestmentsTotal +
+              existingSnapshot.realEstateInvestmentsTotal -
+              existingSnapshot.liabilitiesTotal,
+          },
+        });
+      } else {
+        // Create new snapshot
+        await tx.wealthSnapshot.create({
+          data: {
+            userId,
+            date: today,
+            currency: primaryCurrency,
+            liquidityTotal,
+            marketInvestmentsTotal: 0,
+            cryptoInvestmentsTotal: 0,
+            retirementInvestmentsTotal: 0,
+            realEstateInvestmentsTotal: 0,
+            liabilitiesTotal: 0,
+            netWorth: liquidityTotal, // Initially just the liquidity
+            createdAt: new Date(),
+            isDeleted: false,
+          },
+        });
+      }
+
+      return account;
     });
 
-    return NextResponse.json(account, { status: 201 });
+    return NextResponse.json(result, { status: 201 });
   } catch (error) {
     console.error('Error creating liquidity account:', error);
     return NextResponse.json(

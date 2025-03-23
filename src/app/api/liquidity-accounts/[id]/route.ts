@@ -54,6 +54,7 @@ export async function PATCH(
     }
 
     const userId = session.user.id;
+    const primaryCurrency = session.user.primaryCurrency
     const { id } = params;
     const data = await request.json();
     
@@ -64,29 +65,117 @@ export async function PATCH(
     delete data.isDeleted;
     delete data.deletedAt;
     
-    // First check if the account exists and belongs to the user
-    const existingAccount = await prisma.liquidityAccount.findUnique({
-      where: {
-        id,
-        userId,
-      },
+    // Use a transaction to ensure data consistency across related operations
+    const result = await prisma.$transaction(async (tx) => {
+      // First check if the account exists and belongs to the user
+      const existingAccount = await tx.liquidityAccount.findUnique({
+        where: {
+          id,
+          userId,
+        },
+      });
+
+      if (!existingAccount) {
+        throw new Error('Account not found');
+      }
+
+      // Update the liquidity account
+      const updatedAccount = await tx.liquidityAccount.update({
+        where: { id },
+        data: {
+          ...data,
+          updatedAt: new Date(),
+        },
+      });
+
+      // If balance was updated, create a new AssetValuation record
+      if (data.balance !== undefined && data.balance !== existingAccount.balance) {
+        await tx.assetValuation.create({
+          data: {
+            assetId: id,
+            assetType: 'liquidity',
+            date: new Date(),
+            value: updatedAccount.balance,
+            currency: primaryCurrency,
+            createdAt: new Date(),
+            isDeleted: false,
+          },
+        });
+
+        // Update WealthSnapshot
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // Reset to beginning of day for consistent snapshots
+        
+        // Get existing snapshot for today
+        const existingSnapshot = await tx.wealthSnapshot.findFirst({
+          where: {
+            userId,
+            date: {
+              gte: today,
+              lt: new Date(today.getTime() + 24 * 60 * 60 * 1000), // Next day
+            },
+          },
+        });
+
+        // Calculate total liquidity
+        const liquidityAccounts = await tx.liquidityAccount.findMany({
+          where: {
+            userId,
+            isDeleted: false,
+          },
+        });
+        const liquidityTotal = liquidityAccounts.reduce(
+          (sum, acc) => sum + acc.balance,
+          0
+        );
+
+        if (existingSnapshot) {
+          // Update existing snapshot
+          await tx.wealthSnapshot.update({
+            where: { id: existingSnapshot.id },
+            data: {
+              liquidityTotal,
+              netWorth: 
+                liquidityTotal + 
+                existingSnapshot.marketInvestmentsTotal +
+                existingSnapshot.cryptoInvestmentsTotal +
+                existingSnapshot.retirementInvestmentsTotal +
+                existingSnapshot.realEstateInvestmentsTotal -
+                existingSnapshot.liabilitiesTotal,
+            },
+          });
+        } else {
+          // Create new snapshot
+          await tx.wealthSnapshot.create({
+            data: {
+              userId,
+              date: today,
+              currency: primaryCurrency,
+              liquidityTotal,
+              marketInvestmentsTotal: 0,
+              cryptoInvestmentsTotal: 0,
+              retirementInvestmentsTotal: 0,
+              realEstateInvestmentsTotal: 0,
+              liabilitiesTotal: 0,
+              netWorth: liquidityTotal, // Initially just the liquidity
+              createdAt: new Date(),
+              isDeleted: false,
+            },
+          });
+        }
+      }
+
+      return updatedAccount;
     });
 
-    if (!existingAccount) {
-      return NextResponse.json({ error: 'Account not found' }, { status: 404 });
-    }
-
-    const updatedAccount = await prisma.liquidityAccount.update({
-      where: { id },
-      data: {
-        ...data,
-        updatedAt: new Date(),
-      },
-    });
-
-    return NextResponse.json(updatedAccount);
+    return NextResponse.json(result);
   } catch (error) {
     console.error('Error updating liquidity account:', error);
+    
+    if ((error as Error).message === 'Account not found') {
+      return NextResponse.json({ error: 'Account not found' }, { status: 404 });
+    }
+    
     return NextResponse.json(
       { error: 'Failed to update liquidity account' },
       { status: 500 }
@@ -107,32 +196,118 @@ export async function DELETE(
     }
 
     const userId = session.user.id;
+    const primaryCurrency = session.user.primaryCurrency
     const { id } = params;
     
-    // First check if the account exists and belongs to the user
-    const existingAccount = await prisma.liquidityAccount.findUnique({
-      where: {
-        id,
-        userId,
-      },
+    // Use a transaction to ensure data consistency across related operations
+    const result = await prisma.$transaction(async (tx) => {
+      // First check if the account exists and belongs to the user
+      const existingAccount = await tx.liquidityAccount.findUnique({
+        where: {
+          id,
+          userId,
+        },
+      });
+
+      if (!existingAccount) {
+        throw new Error('Account not found');
+      }
+
+      // Soft delete the account
+      const deletedAccount = await tx.liquidityAccount.update({
+        where: { id },
+        data: {
+          isDeleted: true,
+          deletedAt: new Date(),
+        },
+      });
+
+      // Soft delete associated asset valuations
+      await tx.assetValuation.updateMany({
+        where: {
+          assetId: id,
+          assetType: 'liquidity',
+          isDeleted: false,
+        },
+        data: {
+          isDeleted: true,
+          deletedAt: new Date(),
+        },
+      });
+
+      // Update WealthSnapshot
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Reset to beginning of day for consistent snapshots
+      
+      // Get existing snapshot for today
+      const existingSnapshot = await tx.wealthSnapshot.findFirst({
+        where: {
+          userId,
+          date: {
+            gte: today,
+            lt: new Date(today.getTime() + 24 * 60 * 60 * 1000), // Next day
+          },
+        },
+      });
+
+      // Calculate total liquidity (now excluding the deleted account)
+      const liquidityAccounts = await tx.liquidityAccount.findMany({
+        where: {
+          userId,
+          isDeleted: false,
+        },
+      });
+      const liquidityTotal = liquidityAccounts.reduce(
+        (sum, acc) => sum + acc.balance,
+        0
+      );
+
+      if (existingSnapshot) {
+        // Update existing snapshot
+        await tx.wealthSnapshot.update({
+          where: { id: existingSnapshot.id },
+          data: {
+            liquidityTotal,
+            netWorth: 
+              liquidityTotal + 
+              existingSnapshot.marketInvestmentsTotal +
+              existingSnapshot.cryptoInvestmentsTotal +
+              existingSnapshot.retirementInvestmentsTotal +
+              existingSnapshot.realEstateInvestmentsTotal -
+              existingSnapshot.liabilitiesTotal,
+          },
+        });
+      } else {
+        // Create new snapshot
+        await tx.wealthSnapshot.create({
+          data: {
+            userId,
+            date: today,
+            currency: primaryCurrency, // Default to USD
+            liquidityTotal,
+            marketInvestmentsTotal: 0,
+            cryptoInvestmentsTotal: 0,
+            retirementInvestmentsTotal: 0,
+            realEstateInvestmentsTotal: 0,
+            liabilitiesTotal: 0,
+            netWorth: liquidityTotal,
+            createdAt: new Date(),
+            isDeleted: false,
+          },
+        });
+      }
+
+      return deletedAccount;
     });
 
-    if (!existingAccount) {
-      return NextResponse.json({ error: 'Account not found' }, { status: 404 });
-    }
-
-    // Soft delete
-    const deletedAccount = await prisma.liquidityAccount.update({
-      where: { id },
-      data: {
-        isDeleted: true,
-        deletedAt: new Date(),
-      },
-    });
-
-    return NextResponse.json(deletedAccount);
+    return NextResponse.json(result);
   } catch (error) {
     console.error('Error deleting liquidity account:', error);
+    
+    if ((error as Error).message === 'Account not found') {
+      return NextResponse.json({ error: 'Account not found' }, { status: 404 });
+    }
+    
     return NextResponse.json(
       { error: 'Failed to delete liquidity account' },
       { status: 500 }
