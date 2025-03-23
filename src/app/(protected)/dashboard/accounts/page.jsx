@@ -268,8 +268,7 @@ function DeleteConfirmation({ accountId, accountName, onConfirm, onCancel, isLoa
    return (
       <div className="space-y-4">
          <p>Sei sicuro di voler eliminare il conto "{accountName}"?</p>
-         <p className="text-sm text-destructive">Questa azione non può essere annullata e aggiornerà i record di valutazione correlati.</p>
-         <p className="text-sm text-info">Nota: Tutti i dati relativi a questo conto saranno rimossi permanentemente.</p>
+         <p className="text-sm text-destructive">Questa azione non può essere annullata e eliminerà tutte le transazioni e i dati storici associati a questo conto.</p>
 
          <DialogFooter>
             <Button variant="outline" onClick={onCancel}>
