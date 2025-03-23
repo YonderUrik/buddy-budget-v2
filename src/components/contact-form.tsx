@@ -62,6 +62,7 @@ export function ContactForm({ className }: ContactFormProps) {
       setSuccess(data.message || `Grazie per averci contattato! Ti risponderemo al più presto all'indirizzo ${email}.`)
       setIsLoading(false)
     } catch (error) {
+      console.error(error)
       setError("Si è verificato un errore durante l'invio del messaggio. Riprova più tardi.")
       setIsLoading(false)
     }
@@ -131,7 +132,7 @@ export function ContactForm({ className }: ContactFormProps) {
           />
         </div>
         <div className="text-sm text-muted-foreground">
-          Puoi anche contattarci direttamente all'indirizzo{" "}
+          Puoi anche contattarci direttamente all&apos;indirizzo{" "}
           <a href={`mailto:${SUPPORT_EMAIL}`} className="text-primary hover:underline">
             {SUPPORT_EMAIL}
           </a>

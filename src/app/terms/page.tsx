@@ -23,8 +23,8 @@ export default function TermsPage() {
 
         <h2 className="text-2xl font-semibold mt-8 mb-4">1. Introduzione</h2>
         <p>
-          Benvenuto su {APP_NAME}. I presenti Termini di Servizio ("Termini") regolano l'utilizzo della nostra applicazione web, 
-          inclusi tutti i contenuti, le funzionalità e i servizi offerti tramite {APP_DOMAIN} (il "Servizio").
+          Benvenuto su {APP_NAME}. I presenti Termini di Servizio (&quot;Termini&quot;) regolano l&apos;utilizzo della nostra applicazione web, 
+          inclusi tutti i contenuti, le funzionalità e i servizi offerti tramite {APP_DOMAIN} (il &quot;Servizio&quot;).
         </p>
         <p>
           Utilizzando il nostro Servizio, accetti di essere vincolato da questi Termini. Se non accetti questi Termini, 
@@ -33,7 +33,7 @@ export default function TermsPage() {
 
         <h2 className="text-2xl font-semibold mt-8 mb-4">2. Descrizione del Servizio</h2>
         <p>
-          {APP_NAME} è un'applicazione di gestione finanziaria personale che consente agli utenti di tracciare le proprie 
+          {APP_NAME} è un&apos;applicazione di gestione finanziaria personale che consente agli utenti di tracciare le proprie 
           finanze, creare budget, monitorare spese e investimenti, e visualizzare report finanziari.
         </p>
 
@@ -44,10 +44,10 @@ export default function TermsPage() {
         </p>
         <p>
           Ti impegni a fornire informazioni accurate, aggiornate e complete durante il processo di registrazione e a mantenere 
-          tali informazioni aggiornate. L'uso non autorizzato del tuo account deve essere comunicato immediatamente.
+          tali informazioni aggiornate. L&apos;uso non autorizzato del tuo account deve essere comunicato immediatamente.
         </p>
 
-        <h2 className="text-2xl font-semibold mt-8 mb-4">4. Contenuti dell'Utente</h2>
+        <h2 className="text-2xl font-semibold mt-8 mb-4">4. Contenuti dell&apos;Utente</h2>
         <p>
           Il nostro Servizio consente di inserire, caricare e condividere contenuti come dati finanziari, transazioni e budget. 
           Mantieni tutti i diritti sui tuoi contenuti, ma ci concedi una licenza per utilizzarli al fine di fornirti il Servizio.
@@ -64,7 +64,7 @@ export default function TermsPage() {
 
         <h2 className="text-2xl font-semibold mt-8 mb-4">6. Limitazioni di Responsabilità</h2>
         <p>
-          Il nostro Servizio è fornito "così com'è" e "come disponibile", senza garanzie di alcun tipo, espresse o implicite. 
+          Il nostro Servizio è fornito &quot;così com&apos;è&quot; e &quot;come disponibile&quot;, senza garanzie di alcun tipo, espresse o implicite. 
           Non garantiamo che il Servizio sarà ininterrotto, tempestivo, sicuro o privo di errori.
         </p>
         <p>
@@ -75,13 +75,13 @@ export default function TermsPage() {
         <h2 className="text-2xl font-semibold mt-8 mb-4">7. Modifiche ai Termini</h2>
         <p>
           Ci riserviamo il diritto di modificare o sostituire questi Termini in qualsiasi momento. Le modifiche sostanziali 
-          saranno notificate tramite il nostro Servizio o via email. L'uso continuato del Servizio dopo tali modifiche 
-          costituisce l'accettazione dei nuovi Termini.
+          saranno notificate tramite il nostro Servizio o via email. L&apos;uso continuato del Servizio dopo tali modifiche 
+          costituisce l&apos;accettazione dei nuovi Termini.
         </p>
 
         <h2 className="text-2xl font-semibold mt-8 mb-4">8. Contatti</h2>
         <p>
-          Per domande sui presenti Termini, contattaci all'indirizzo <a href={`mailto:${SUPPORT_EMAIL}`} className="text-primary hover:underline">{SUPPORT_EMAIL}</a> 
+          Per domande sui presenti Termini, contattaci all&apos;indirizzo <a href={`mailto:${SUPPORT_EMAIL}`} className="text-primary hover:underline">{SUPPORT_EMAIL}</a> 
           o visita la nostra <a href="/support" className="text-primary hover:underline">pagina di supporto</a>.
         </p>
       </div>

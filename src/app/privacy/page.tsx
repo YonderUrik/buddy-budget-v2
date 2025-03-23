@@ -23,8 +23,8 @@ export default function PrivacyPage() {
 
         <h2 className="text-2xl font-semibold mt-8 mb-4">1. Introduzione</h2>
         <p>
-          La presente Privacy Policy descrive come {APP_NAME} ("noi", "nostro" o "{APP_NAME}") raccoglie, utilizza e condivide 
-          le informazioni personali quando utilizzi il nostro sito web {APP_DOMAIN} e i servizi correlati (collettivamente, il "Servizio").
+          La presente Privacy Policy descrive come {APP_NAME} (&quot;noi&quot;, &quot;nostro&quot; o &#34;{APP_NAME}&ldquo;) raccoglie, utilizza e condivide 
+          le informazioni personali quando utilizzi il nostro sito web {APP_DOMAIN} e i servizi correlati (collettivamente, il &quot;Servizio&quot;).
         </p>
         <p>
           Rispettiamo la tua privacy e ci impegniamo a proteggere le tue informazioni personali. Ti invitiamo a leggere attentamente 
@@ -84,7 +84,7 @@ export default function PrivacyPage() {
           <li>Richiedere la portabilità dei tuoi dati</li>
         </ul>
         <p>
-          Per esercitare questi diritti, contattaci all'indirizzo email indicato nella sezione "Contatti".
+          Per esercitare questi diritti, contattaci all&apos;indirizzo email indicato nella sezione &quot;Contatti&quot;.
         </p>
 
         <h2 className="text-2xl font-semibold mt-8 mb-4">7. Cookie e Tecnologie Simili</h2>
@@ -101,7 +101,7 @@ export default function PrivacyPage() {
 
         <h2 className="text-2xl font-semibold mt-8 mb-4">9. Contatti</h2>
         <p>
-          Per domande o preoccupazioni riguardo alla nostra Privacy Policy o alle nostre pratiche relative ai dati, contattaci all'indirizzo 
+          Per domande o preoccupazioni riguardo alla nostra Privacy Policy o alle nostre pratiche relative ai dati, contattaci all&apos;indirizzo 
           <a href={`mailto:${PRIVACY_EMAIL}`} className="text-primary hover:underline"> {PRIVACY_EMAIL}</a> o visita la nostra 
           <a href="/support" className="text-primary hover:underline"> pagina di supporto</a>.
         </p>

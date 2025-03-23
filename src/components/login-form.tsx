@@ -5,10 +5,12 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { signIn } from "next-auth/react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Eye, EyeOff } from "lucide-react"
+import { APP_NAME } from "@/lib/config";
+import Image from "next/image";
 
 export function LoginForm({
   className,
@@ -19,7 +21,28 @@ export function LoginForm({
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const [callbackUrl, setCallbackUrl] = useState<string>("/dashboard")
   const router = useRouter()
+  const searchParams = useSearchParams()
+  
+  // Get callbackUrl from query params or sessionStorage
+  useEffect(() => {
+    // Priority 1: URL query parameter
+    const urlCallbackUrl = searchParams.get("callbackUrl")
+    
+    // Priority 2: sessionStorage (from expired session)
+    const storedCallbackUrl = typeof window !== 'undefined' 
+      ? sessionStorage.getItem('callbackUrl') 
+      : null
+    
+    if (urlCallbackUrl) {
+      setCallbackUrl(decodeURIComponent(urlCallbackUrl))
+    } else if (storedCallbackUrl) {
+      setCallbackUrl(storedCallbackUrl)
+      // Clear from storage after using it once
+      sessionStorage.removeItem('callbackUrl')
+    }
+  }, [searchParams])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -39,10 +62,11 @@ export function LoginForm({
         return
       }
 
-      // Redirect to dashboard on successful login
-      router.push("/dashboard")
+      // Redirect to callbackUrl or dashboard on successful login
+      router.push(callbackUrl)
       router.refresh()
     } catch (error) {
+      console.error(error)
       setError("Si è verificato un errore durante il login. Riprova.")
       setIsLoading(false)
     }
@@ -57,7 +81,7 @@ export function LoginForm({
               <div className="flex flex-col items-center text-center">
                 <h1 className="text-2xl font-bold">Bentornato</h1>
                 <p className="text-muted-foreground text-balance">
-                  Accedi al tuo account Buddy Budget
+                  Accedi al tuo account {APP_NAME}
                 </p>
               </div>
               {error && (
@@ -87,10 +111,10 @@ export function LoginForm({
                   </a>
                 </div>
                 <div className="relative">
-                  <Input 
-                    id="password" 
+                  <Input
+                    id="password"
                     type={showPassword ? "text" : "password"}
-                    required 
+                    required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                   />
@@ -122,10 +146,12 @@ export function LoginForm({
             </div>
           </form>
           <div className="bg-muted relative hidden md:block">
-            <img
-              src="/placeholder.svg"
+            <Image
+              src="/placeholder.jpg"
+              width={1920}
+              height={1080}
               alt="Image"
-              className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
+              className="absolute inset-0 h-full w-full object-fit dark:brightness-[0.5]"
             />
           </div>
         </CardContent>

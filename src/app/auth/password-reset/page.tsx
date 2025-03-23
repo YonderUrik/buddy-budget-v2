@@ -1,9 +1,10 @@
 import { PasswordResetForm } from "@/components/password-reset-form"
+import { APP_NAME } from "@/lib/config"
 import { Metadata } from "next"
 
 export const metadata: Metadata = {
-  title: "Recupero Password - Buddy Budget",
-  description: "Recupera la password del tuo account Buddy Budget",
+  title: `Recupero Password - ${APP_NAME}`,
+  description: `Recupera la password del tuo account ${APP_NAME}`,
 }
 
 export default function PasswordResetPage() {

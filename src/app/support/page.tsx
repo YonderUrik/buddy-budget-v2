@@ -3,10 +3,8 @@ import { Metadata } from "next"
 import { PageHeader } from "@/components/ui/page-header"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { ContactForm } from "@/components/contact-form"
-import { APP_NAME, SUPPORT_EMAIL, APP_DOMAIN } from "@/lib/config"
-import { Mail, MessageSquare, Phone } from "lucide-react"
+import { APP_NAME } from "@/lib/config"
 import Link from "next/link"
-import { Card, CardContent } from "@/components/ui/card"
 
 export const metadata: Metadata = {
    title: `Supporto Clienti - ${APP_NAME}`,
@@ -16,7 +14,7 @@ export const metadata: Metadata = {
 export default function SupportPage() {
    return (
       <div className="container max-w-6xl mx-auto py-12 px-4">
-         <PageHeader 
+         <PageHeader
             title="Supporto Clienti"
             description="Come possiamo aiutarti oggi?"
             backUrl="/auth/login"
@@ -37,7 +35,7 @@ export default function SupportPage() {
                   <AccordionItem value="item-2">
                      <AccordionTrigger>Come posso reimpostare la mia password?</AccordionTrigger>
                      <AccordionContent>
-                        Se hai dimenticato la password, vai alla pagina di login e clicca su "Password dimenticata?".
+                        Se hai dimenticato la password, vai alla pagina di login e clicca su &quot;Password dimenticata?&quot;.
                         Inserisci il tuo indirizzo email e ti invieremo un codice di verifica per reimpostare la password.
                      </AccordionContent>
                   </AccordionItem>

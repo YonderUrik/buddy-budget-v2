@@ -1,9 +1,10 @@
 import { LoginForm } from "@/components/login-form"
+import { APP_NAME } from "@/lib/config"
 import { Metadata } from "next"
 
 export const metadata: Metadata = {
-  title: "Login - Buddy Budget",
-  description: "Accedi al tuo account Buddy Budget",
+  title: `Login - ${APP_NAME}`,
+  description: `Accedi al tuo account ${APP_NAME}`,
 }
 
 export default function LoginPage() {

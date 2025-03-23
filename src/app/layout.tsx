@@ -3,12 +3,17 @@ import { Inter } from "next/font/google";
 import "../styles/globals.css";
 import AuthProvider from "@/providers/auth-provider";
 import { ThemeProvider } from "@/providers/theme-provider";
+import { APP_NAME } from "@/lib/config";
+import { Toaster } from "sonner";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Buddy Budget",
+  title: APP_NAME,
   description: "Track your finances and build wealth",
+  icons: {
+    icon: "/favicon.ico", // Insert favicon here
+  },
 };
 
 export default function RootLayout({
@@ -20,6 +25,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
         <AuthProvider>
+          <Toaster position="top-right"/>
           <ThemeProvider>
             {children}
           </ThemeProvider>

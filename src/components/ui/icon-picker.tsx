@@ -34,7 +34,7 @@ export function IconPicker({ value, onChange, className }: IconPickerProps) {
   const [searchQuery, setSearchQuery] = React.useState("");
 
   // Get the current icon component
-  const IconComponent = value ? (LucideIcons as any)[toPascalCase(value)] || LucideIcons.CircleDashed : LucideIcons.CircleDashed;
+  const IconComponent = value ? (LucideIcons as never)[toPascalCase(value)] || LucideIcons.CircleDashed : LucideIcons.CircleDashed;
 
   // Convert kebab-case to PascalCase for Lucide icon names
   function toPascalCase(str: string) {
@@ -78,7 +78,7 @@ export function IconPicker({ value, onChange, className }: IconPickerProps) {
               <CommandGroup key={category} heading={category}>
                 <div className="grid grid-cols-4 gap-1 p-2">
                   {icons.map((icon) => {
-                    const IconComp = (LucideIcons as any)[toPascalCase(icon)];
+                    const IconComp = (LucideIcons as never)[toPascalCase(icon)];
                     return (
                       <CommandItem
                         key={icon}

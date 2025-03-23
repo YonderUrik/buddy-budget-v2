@@ -1,5 +1,4 @@
-import NextAuth, { DefaultSession } from "next-auth";
-import { JWT } from "next-auth/jwt";
+import { DefaultSession } from "next-auth";
 
 declare module "next-auth" {
   /**
@@ -8,6 +7,7 @@ declare module "next-auth" {
   interface User {
     id: string;
     hasCompletedOnboarding: boolean;
+    primaryCurrency : string
     // Altri campi personalizzati...
   }
 
@@ -18,6 +18,7 @@ declare module "next-auth" {
     user: {
       id: string;
       hasCompletedOnboarding: boolean;
+      primaryCurrency : string
     } & DefaultSession["user"];
   }
 }
@@ -29,5 +30,7 @@ declare module "next-auth/jwt" {
   interface JWT {
     id: string;
     hasCompletedOnboarding: boolean;
+    primaryCurrency : string
+    isValid?: boolean;
   }
 } 

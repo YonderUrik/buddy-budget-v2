@@ -4,57 +4,50 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-// @ts-ignore - react-hook-form does export useForm, but TypeScript isn't recognizing it
+// @ts-expect-error - Work around linter error with react-hook-form in TypeScript
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { useTheme } from "next-themes";
 import * as LucideIcons from "lucide-react";
+import axios from 'axios';
 
-import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { DefaultCategories, defaultCategories } from "@/components/onboarding/default-categories";
 import { CategoryForm } from "@/components/onboarding/category-form";
 import { AccountForm } from "@/components/onboarding/account-form";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogFooter, 
-  DialogHeader, 
-  DialogTitle 
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
 } from "@/components/ui/dialog";
 
-import { 
-  ArrowRight, 
-  ArrowLeft, 
-  Check, 
-  CreditCard, 
-  Wallet, 
-  Landmark, 
-  Coins, 
-  PiggyBank, 
-  Languages, 
-  DollarSign, 
-  Euro, 
-  PoundSterling, 
-  Circle, 
-  Bitcoin,
+import {
+  ArrowRight,
+  ArrowLeft,
+  Check,
+  CreditCard,
+  Wallet,
+  Landmark,
+  PiggyBank,
+  DollarSign,
+  Euro,
+  PoundSterling,
   Plus,
-  Trash2,
-  Tag,
   ArrowDown,
   ArrowUp,
-  ShoppingBag
+  BadgeCheck,
+  Settings,
+  BarChart3
 } from "lucide-react";
+import { createFormatters } from "@/lib/utils";
+import { CURRENCY_OPTIONS } from "@/components/settings/personal-info-form";
 
 // Schema di validazione per il form di onboarding
 const onboardingSchema = z.object({
@@ -90,23 +83,30 @@ const onboardingSchema = z.object({
   ).optional(),
 });
 
+// Convert kebab-case to PascalCase for Lucide icon names
+function toPascalCase(str: string) {
+  return str
+    .split("-")
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join("");
+}
+
 type OnboardingFormValues = z.infer<typeof onboardingSchema>;
 
 // Componente principale della pagina di onboarding
 export default function OnboardingPage() {
   const router = useRouter();
-  const { data: session, update } = useSession();
+  const { update } = useSession();
   const [step, setStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { setTheme } = useTheme();
   const [useDefaultCategories, setUseDefaultCategories] = useState(true);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  
+
   // Stati per tenere traccia degli account e delle categorie
-  const [accounts, setAccounts] = useState<any[]>([
-    { name: "Conto Corrente", type: "checking", balance: 0 }
+  const [accounts, setAccounts] = useState<{ name: string; type: "checking" | "savings" | "cash" | "other"; balance: number }[]>([
+    { name: "", type: "checking", balance: 0 }
   ]);
-  const [categories, setCategories] = useState<any[]>([]);
+  const [categories, setCategories] = useState<{ name: string; type: "income" | "expense"; icon?: string; color?: string; subcategories?: { name: string }[] }[]>([]);
 
   // Inizializza il form con valori predefiniti
   const form = useForm<OnboardingFormValues>({
@@ -115,7 +115,7 @@ export default function OnboardingPage() {
       language: "it",
       primaryCurrency: "EUR",
       liquidityAccounts: [
-        { name: "Conto Corrente", type: "checking", balance: 0 }
+        { name: "", type: "checking", balance: 0 }
       ],
       categories: [],
     },
@@ -156,14 +156,14 @@ export default function OnboardingPage() {
       setUseDefaultCategories(false);
       setCategories([]);
     }
-    
+
     const color = type === "income" ? "#4CAF50" : "#F44336"; // Verde per income, rosso per expense
     setCategories([
       ...categories,
-      { 
-        name: "", 
-        type, 
-        icon: type === "income" ? "trending-up" : "shopping-bag", 
+      {
+        name: "",
+        type,
+        icon: type === "income" ? "trending-up" : "shopping-bag",
         color,
         subcategories: []
       }
@@ -189,40 +189,41 @@ export default function OnboardingPage() {
 
   // Funzione per rimuovere una sottocategoria
   const removeSubcategory = (parentIndex: number, subIndex: number) => {
-    if (categories[parentIndex] && categories[parentIndex].subcategories) {
+    if (categories[parentIndex]?.subcategories) {
       const updatedCategories = [...categories];
-      updatedCategories[parentIndex].subcategories = updatedCategories[parentIndex].subcategories.filter(
-        (_: any, i: number) => i !== subIndex
+      updatedCategories[parentIndex].subcategories = updatedCategories[parentIndex].subcategories?.filter(
+        (_, i) => i !== subIndex
       );
       setCategories(updatedCategories);
     }
   };
 
   // Funzione per aggiornare un campo specifico di un account
-  const updateAccount = (index: number, field: string, value: any) => {
+  const updateAccount = (index: number, field: string, value: string) => {
     const updatedAccounts = [...accounts];
     updatedAccounts[index] = { ...updatedAccounts[index], [field]: value };
     setAccounts(updatedAccounts);
   };
 
   // Funzione per aggiornare un campo specifico di una categoria
-  const updateCategory = (index: number, field: string, value: any) => {
+  const updateCategory = (index: number, field: string, value: string) => {
     const updatedCategories = [...categories];
     updatedCategories[index] = { ...updatedCategories[index], [field]: value };
     setCategories(updatedCategories);
   };
 
   // Funzione per gestire l'invio del form
-  const onSubmit = async (data: OnboardingFormValues) => {
+  const onSubmit = async () => {
     // Instead of submitting immediately, show the confirmation dialog
     setShowConfirmDialog(true);
   };
-  
+
+
   // Function to handle the actual submission after confirmation
   const handleConfirmedSubmit = async () => {
     setIsSubmitting(true);
     setShowConfirmDialog(false);
-    
+
     try {
       // Get the form values and properly handle categories
       const formValues = form.getValues();
@@ -231,34 +232,27 @@ export default function OnboardingPage() {
         // Send default categories if useDefaultCategories is true, otherwise use the custom categories
         categories: useDefaultCategories ? defaultCategories : formValues.categories
       };
-        
-      const response = await fetch("/api/user/onboarding", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(formData),
-      });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Si è verificato un errore durante l'onboarding");
+      const response = await axios.post("/api/user/onboarding", formData);
+
+      // Check for response status
+      if (response.status !== 200) {
+        throw new Error(response.data.message || "Si è verificato un errore durante l'onboarding");
       }
 
       // Aggiorna la sessione per riflettere che l'onboarding è stato completato
       await update({ hasCompletedOnboarding: true });
-      
+
       toast.success("Onboarding completato con successo!");
       router.push("/dashboard");
     } catch (error) {
-      console.error("Errore durante l'onboarding:", error);
       toast.error(error instanceof Error ? error.message : "Si è verificato un errore durante l'onboarding");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  console.log("categories", categories)
+  const { formatCurrency } = createFormatters()
 
   // Array di passi dell'onboarding
   const steps = [
@@ -270,11 +264,11 @@ export default function OnboardingPage() {
           <FormField
             control={form.control}
             name="language"
-            render={({ field }: { field: any }) => (
+            render={({ field }: { field: { onChange: (value: string) => void; value: string } }) => (
               <FormItem>
                 <FormLabel>Lingua</FormLabel>
                 <FormDescription>
-                  Scegli la lingua dell'interfaccia
+                  Scegli la lingua dell&apos;interfaccia
                 </FormDescription>
                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                   <FormControl>
@@ -294,7 +288,7 @@ export default function OnboardingPage() {
           <FormField
             control={form.control}
             name="primaryCurrency"
-            render={({ field }: { field: any }) => (
+            render={({ field }: { field: { onChange: (value: string) => void; value: string } }) => (
               <FormItem>
                 <FormLabel>Valuta Principale</FormLabel>
                 <FormDescription>
@@ -307,36 +301,15 @@ export default function OnboardingPage() {
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="EUR">
-                      <div className="flex items-center">
-                        <Euro className="mr-2 h-4 w-4" />
-                        <span>Euro (EUR)</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="USD">
-                      <div className="flex items-center">
-                        <DollarSign className="mr-2 h-4 w-4" />
-                        <span>Dollaro USA (USD)</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="GBP">
-                      <div className="flex items-center">
-                        <PoundSterling className="mr-2 h-4 w-4" />
-                        <span>Sterlina (GBP)</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="JPY">
-                      <div className="flex items-center">
-                        <Circle className="mr-2 h-4 w-4" />
-                        <span>Yen (JPY)</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="CHF">
-                      <div className="flex items-center">
-                        <Coins className="mr-2 h-4 w-4" />
-                        <span>Franco Svizzero (CHF)</span>
-                      </div>
-                    </SelectItem>
+                    {CURRENCY_OPTIONS.map((currency) => (
+                      <SelectItem key={currency.value} value={currency.value}>
+                        <div className="flex items-center">
+                          <Euro className="mr-2 h-4 w-4" />
+                          <span>{currency.label}</span>
+                        </div>
+                      </SelectItem>
+
+                    ))}
                   </SelectContent>
                 </Select>
                 <FormMessage />
@@ -351,124 +324,273 @@ export default function OnboardingPage() {
       description: "Aggiungi i tuoi conti bancari e contanti",
       content: (
         <div className="space-y-6">
-          <div className="flex justify-between items-center">
-            <FormLabel className="text-lg">I tuoi Conti</FormLabel>
+          <div className="flex justify-between items-center mb-2">
+            <FormLabel className="text-lg font-semibold">I tuoi Conti</FormLabel>
             <Button
               type="button"
               variant="outline"
               onClick={addLiquidityAccount}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 bg-primary/10 hover:bg-primary/20 transition-colors"
             >
               <Plus className="h-4 w-4" />
               Aggiungi Conto
             </Button>
           </div>
-          
-          <FormDescription>
-            Aggiungi i tuoi conti bancari, risparmi e contanti per tenere traccia delle tue finanze
+
+          <FormDescription className="text-sm text-muted-foreground mb-4">
+            Aggiungi i tuoi conti bancari, risparmi e contanti per monitorare il tuo patrimonio liquidità
           </FormDescription>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {accounts.map((account, index) => (
-              <AccountForm 
-                key={index}
-                form={form}
-                index={index}
-                account={account}
-                removeAccount={removeLiquidityAccount}
-                currency={form.getValues("primaryCurrency")}
-                updateAccount={(field, value) => updateAccount(index, field, value)}
-              />
-            ))}
-          </div>
+
+          {accounts.length === 0 ? (
+            <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-lg bg-muted/20">
+              <Wallet className="h-12 w-12 text-muted-foreground mb-3 opacity-50" />
+              <p className="text-center text-muted-foreground mb-4">Non hai ancora aggiunto nessun conto</p>
+              <Button onClick={addLiquidityAccount} variant="default" size="sm">
+                <Plus className="h-4 w-4 mr-2" /> Aggiungi il tuo primo conto
+              </Button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {accounts.map((account, index) => (
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2, delay: index * 0.05 }}
+                >
+                  <AccountForm
+                    key={index}
+                    form={form}
+                    index={index}
+                    account={account}
+                    removeAccount={removeLiquidityAccount}
+                    currency={form.getValues("primaryCurrency")}
+                    updateAccount={(field, value) => updateAccount(index, field, value)}
+                  />
+                </motion.div>
+              ))}
+            </div>
+          )}
+
+          {accounts.length > 0 && (
+            <div className="mt-4 p-4 bg-muted/30 rounded-md flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div>
+                  <p className="text-sm font-medium">Bilancio Totale</p>
+                  <p className="text-xs text-muted-foreground">Somma di tutti i tuoi conti</p>
+                </div>
+              </div>
+              <p className="text-lg font-semibold">
+                {formatCurrency(accounts.reduce((sum, account) => sum + (account.balance || 0), 0), form.getValues("primaryCurrency"))}
+              </p>
+            </div>
+          )}
         </div>
       ),
     },
     {
       title: "Categorie",
-      description: "Imposta le tue categorie di entrate e spese",
+      description: "Imposta le tue categorie di entrate e uscite",
       content: (
         <div className="space-y-6">
           <div className="flex flex-col space-y-4">
             <div className="flex items-center justify-between">
-              <FormLabel className="text-lg">Le tue Categorie</FormLabel>
-              <div className="flex space-x-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => addCategory("income")}
-                  className="flex items-center gap-2 bg-green-50 hover:bg-green-100 text-green-700 border-green-200"
-                >
-                  <ArrowUp className="h-4 w-4" />
-                  Entrata
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => addCategory("expense")}
-                  className="flex items-center gap-2 bg-red-50 hover:bg-red-100 text-red-700 border-red-200"
-                >
-                  <ArrowDown className="h-4 w-4" />
-                  Spesa
-                </Button>
+              <FormLabel className="text-lg font-semibold">Le tue Categorie</FormLabel>
+            </div>
+
+            <div className="p-3 mt-2 mb-2 border rounded-md bg-muted/20">
+              <div className="flex items-center gap-3">
+                <div className="relative inline-flex items-center">
+                  <input
+                    type="checkbox"
+                    id="useDefaultCategories"
+                    checked={useDefaultCategories}
+                    onChange={(e) => {
+                      setUseDefaultCategories(e.target.checked);
+                      if (e.target.checked) {
+                        setCategories([]);
+                      }
+                    }}
+                    className="peer h-4 w-4 shrink-0 rounded-sm border border-primary ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
+                  />
+                  <label htmlFor="useDefaultCategories" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 ml-2">
+                    Usa le categorie predefinite
+                  </label>
+                </div>
+                <div className="flex-1">
+                  <span className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full">Consigliato</span>
+                </div>
               </div>
+
+              <p className="text-xs text-muted-foreground mt-2">
+                {useDefaultCategories
+                  ? "Utilizziamo un set completo di categorie comuni per entrate e uscite per aiutarti a iniziare velocemente."
+                  : "Stai usando categorie personalizzate. Perderai le categorie predefinite."}
+              </p>
             </div>
-            
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="useDefaultCategories"
-                checked={useDefaultCategories}
-                onChange={(e) => {
-                  setUseDefaultCategories(e.target.checked);
-                  if (e.target.checked) {
-                    setCategories([]);
-                  }
-                }}
-                className="rounded border-gray-300 text-primary focus:ring-primary"
-              />
-              <label htmlFor="useDefaultCategories" className="text-sm">
-                Usa le categorie predefinite (consigliato)
-              </label>
-            </div>
-            
-            <FormDescription>
-              {useDefaultCategories 
-                ? "Verranno create categorie predefinite per entrate e spese." 
-                : "Aggiungi categorie personalizzate per entrate e spese."}
-            </FormDescription>
           </div>
-          
+
           {useDefaultCategories ? (
-            <div className="mt-4 border rounded-md p-4 bg-muted/20">
-              <h3 className="text-sm font-medium mb-3">Anteprima delle categorie predefinite:</h3>
-              <DefaultCategories showSubcategories={true} />
-            </div>
+            <motion.div
+              className="mt-4 border rounded-md p-5 bg-muted/10"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
+                <Check className="h-4 w-4 text-green-500" />
+                Anteprima delle categorie predefinite:
+              </h3>
+              <div className="overflow-y-auto max-h-[350px] pr-2 custom-scrollbar">
+                <DefaultCategories showSubcategories={true} />
+              </div>
+            </motion.div>
           ) : (
             <div className="space-y-4">
-              {categories.length === 0 && (
-                <div className="text-center py-8 border rounded-md border-dashed">
-                  <p className="text-muted-foreground">
+              {categories.length === 0 ? (
+                <motion.div
+                  className="text-center py-12 border-2 rounded-md border-dashed flex flex-col items-center justify-center"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <div className="mb-4 p-3 rounded-full bg-muted/40">
+                    <Plus className="h-6 w-6 text-muted-foreground" />
+                  </div>
+                  <p className="text-muted-foreground mb-4">
                     Nessuna categoria personalizzata.
                     <br />
-                    Usa i pulsanti "Entrata" e "Spesa" per aggiungerne.
+                    Crea categorie per organizzare le tue entrate e uscite.
                   </p>
+                  <div className="flex space-x-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => addCategory("income")}
+                      className="flex items-center gap-2 bg-green-50 hover:bg-green-100 text-green-700 border-green-200"
+                      size="sm"
+                    >
+                      <ArrowUp className="h-4 w-4" />
+                      Aggiungi Entrata
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => addCategory("expense")}
+                      className="flex items-center gap-2 bg-red-50 hover:bg-red-100 text-red-700 border-red-200"
+                      size="sm"
+                    >
+                      <ArrowDown className="h-4 w-4" />
+                      Aggiungi Spesa
+                    </Button>
+                  </div>
+                </motion.div>
+              ) : (
+                <div>
+                  <div className="mb-4 flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <div className="size-2 rounded-full bg-green-500"></div>
+                      <h3 className="text-sm font-medium">Categorie di Entrata ({categories.filter(c => c.type === "income").length})</h3>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => addCategory("income")}
+                      className="flex items-center gap-1 text-xs h-8 text-green-700"
+                      size="sm"
+                    >
+                      <Plus className="h-3 w-3" />
+                      Aggiungi
+                    </Button>
+                  </div>
+
+                  {categories.filter(c => c.type === "income").length === 0 ? (
+                    <div className="mb-6 text-center py-4 border rounded-md border-dashed text-sm text-muted-foreground">
+                      Nessuna categoria di entrata. Aggiungine una.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                      {categories
+                        .filter(c => c.type === "income")
+                        .map((category, index) => {
+                          const categoryIndex = categories.findIndex(c => c === category);
+                          return (
+                            <motion.div
+                              key={index}
+                              initial={{ opacity: 0, x: -10 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ duration: 0.2, delay: index * 0.05 }}
+                            >
+                              <CategoryForm
+                                index={categoryIndex}
+                                category={category}
+                                removeCategory={removeCategory}
+                                addSubcategory={addSubcategory}
+                                removeSubcategory={removeSubcategory}
+                                updateCategory={(field, value) => updateCategory(categoryIndex, field, value)}
+                              />
+                            </motion.div>
+                          );
+                        })}
+                    </div>
+                  )}
+
+                  <div className="mb-4 flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <div className="size-2 rounded-full bg-red-500"></div>
+                      <h3 className="text-sm font-medium">Categorie di Spesa ({categories.filter(c => c.type === "expense").length})</h3>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => addCategory("expense")}
+                      className="flex items-center gap-1 text-xs h-8 text-red-700"
+                      size="sm"
+                    >
+                      <Plus className="h-3 w-3" />
+                      Aggiungi
+                    </Button>
+                  </div>
+
+                  {categories.filter(c => c.type === "expense").length === 0 ? (
+                    <div className="text-center py-4 border rounded-md border-dashed text-sm text-muted-foreground">
+                      Nessuna categoria di spesa. Aggiungine una.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {categories
+                        .filter(c => c.type === "expense")
+                        .map((category, index) => {
+                          const categoryIndex = categories.findIndex(c => c === category);
+                          return (
+                            <motion.div
+                              key={index}
+                              initial={{ opacity: 0, x: -10 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ duration: 0.2, delay: index * 0.05 }}
+                            >
+                              <CategoryForm
+                                index={categoryIndex}
+                                category={category}
+                                removeCategory={removeCategory}
+                                addSubcategory={addSubcategory}
+                                removeSubcategory={removeSubcategory}
+                                updateCategory={(field, value) => updateCategory(categoryIndex, field, value)}
+                              />
+                            </motion.div>
+                          );
+                        })}
+                    </div>
+                  )}
                 </div>
               )}
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {categories.map((category, index) => (
-                  <CategoryForm 
-                    key={index}
-                    form={form}
-                    index={index}
-                    category={category}
-                    removeCategory={removeCategory}
-                    addSubcategory={addSubcategory}
-                    removeSubcategory={removeSubcategory}
-                    updateCategory={(field, value) => updateCategory(index, field, value)}
-                  />
-                ))}
+            </div>
+          )}
+
+          {!useDefaultCategories && categories.length > 0 && (
+            <div className="flex justify-end mt-6">
+              <div className="flex items-center gap-2 text-sm">
+                <span className="opacity-70">Totale: {categories.length} categorie, {categories.reduce((acc, cat) => acc + (cat.subcategories?.length || 0), 0)} sottocategorie</span>
               </div>
             </div>
           )}
@@ -480,9 +602,20 @@ export default function OnboardingPage() {
       description: "Verifica e conferma le tue impostazioni",
       content: (
         <div className="space-y-6">
+          <div className="text-center mb-6">
+            <div className="inline-flex items-center justify-center p-3 bg-primary/10 rounded-full mb-3">
+              <BadgeCheck className="h-8 w-8 text-primary" />
+            </div>
+            <h3 className="text-xl font-semibold">Quasi fatto!</h3>
+            <p className="text-muted-foreground">Rivedi le tue impostazioni prima di iniziare ad utilizzare Buddy Budget</p>
+          </div>
+
           <Card>
             <CardHeader>
-              <CardTitle>Preferenze</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <Settings className="h-5 w-5 text-muted-foreground" />
+                Preferenze
+              </CardTitle>
               <CardDescription>Le tue preferenze di base</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -499,15 +632,23 @@ export default function OnboardingPage() {
                 </div>
                 <div>
                   <h4 className="text-sm font-medium text-muted-foreground">Valuta Principale</h4>
-                  <p className="text-base">{form.getValues("primaryCurrency")}</p>
+                  <p className="text-base flex items-center">
+                    {form.getValues("primaryCurrency") === "EUR" && <Euro className="mr-2 h-4 w-4" />}
+                    {form.getValues("primaryCurrency") === "USD" && <DollarSign className="mr-2 h-4 w-4" />}
+                    {form.getValues("primaryCurrency") === "GBP" && <PoundSterling className="mr-2 h-4 w-4" />}
+                    {form.getValues("primaryCurrency")}
+                  </p>
                 </div>
               </div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader>
-              <CardTitle>Conti di Liquidità</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5 text-muted-foreground" />
+                Conti di Liquidità
+              </CardTitle>
               <CardDescription>I tuoi conti bancari e contanti</CardDescription>
             </CardHeader>
             <CardContent>
@@ -522,7 +663,7 @@ export default function OnboardingPage() {
                       default: return <CreditCard className="h-5 w-5 text-primary" />;
                     }
                   };
-                  
+
                   const getAccountTypeLabel = (type: string) => {
                     switch (type) {
                       case "checking": return "Conto Corrente";
@@ -532,9 +673,9 @@ export default function OnboardingPage() {
                       default: return "Conto";
                     }
                   };
-                  
+
                   return (
-                    <div key={index} className="flex justify-between items-center p-3 border rounded-md">
+                    <div key={index} className="flex justify-between items-center p-3 border rounded-md hover:bg-muted/20 transition-colors">
                       <div className="flex items-center gap-3">
                         {getAccountTypeIcon(account.type)}
                         <div>
@@ -546,34 +687,48 @@ export default function OnboardingPage() {
                       </div>
                       <div className="text-right">
                         <p className="font-medium">
-                          {account.balance.toFixed(2)} 
-                          {form.getValues("primaryCurrency") === "EUR" && "€"}
-                          {form.getValues("primaryCurrency") === "USD" && "$"}
-                          {form.getValues("primaryCurrency") === "GBP" && "£"}
-                          {form.getValues("primaryCurrency") === "JPY" && "¥"}
-                          {form.getValues("primaryCurrency") === "CHF" && "Fr"}
+                          {formatCurrency(account.balance, form.getValues("primaryCurrency"))}
+
                           {!["EUR", "USD", "GBP", "JPY", "CHF"].includes(form.getValues("primaryCurrency")) && form.getValues("primaryCurrency")}
                         </p>
                       </div>
                     </div>
                   );
                 })}
+
+                <div className="mt-2 p-3 bg-muted/20 rounded-md flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium">Bilancio Totale</p>
+                  </div>
+                  <p className="font-semibold">
+                    {formatCurrency(accounts.reduce((sum, account) => sum + (account.balance || 0), 0), form.getValues("primaryCurrency"))}
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader>
-              <CardTitle>Categorie</CardTitle>
-              <CardDescription>Le tue categorie di entrate e spese</CardDescription>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5 text-muted-foreground" />
+                Categorie
+              </CardTitle>
+              <CardDescription>Le tue categorie di entrate e uscite</CardDescription>
             </CardHeader>
             <CardContent>
               {useDefaultCategories ? (
-                <div className="p-3 border rounded-md">
-                  <p className="text-muted-foreground mb-2">
-                    Verranno create le categorie predefinite per entrate e spese.
+                <div className="p-3 border rounded-md bg-muted/10">
+                  <div className="flex items-center gap-2 mb-2">
+                    <BadgeCheck className="h-5 w-5 text-green-500" />
+                    <p className="font-medium">Utilizzerai il set di categorie predefinite</p>
+                  </div>
+                  <p className="text-muted-foreground mb-4 text-sm">
+                    Verranno create categorie predefinite ottimizzate per gestire al meglio le tue finanze personali
                   </p>
-                  <DefaultCategories compact={true} showSubcategories={false} />
+                  <div className="max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
+                    <DefaultCategories compact={true} showSubcategories={false} />
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -584,49 +739,94 @@ export default function OnboardingPage() {
                       </p>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {categories.map((category, index) => {
-                        const IconComponent = category.icon 
-                          ? (LucideIcons as any)[toPascalCase(category.icon)] || LucideIcons.CircleDashed 
-                          : category.type === "income" 
-                            ? LucideIcons.TrendingUp 
-                            : LucideIcons.ShoppingBag;
-                            
-                        // Convert kebab-case to PascalCase for Lucide icon names
-                        function toPascalCase(str: string) {
-                          return str
-                            .split("-")
-                            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-                            .join("");
-                        }
-                        
-                        return (
-                          <Card key={index} className={`border-l-4 ${category.type === 'income' ? 'border-l-green-500' : 'border-l-red-500'}`}>
-                            <CardContent className="p-4 flex items-center gap-3">
-                              <div 
-                                className="flex items-center justify-center h-10 w-10 rounded-full" 
-                                style={{ backgroundColor: category.color || (category.type === "income" ? "#4CAF50" : "#F44336") }}
-                              >
-                                <IconComponent className="h-5 w-5 text-white" />
-                              </div>
-                              <div>
-                                <p className="font-medium">{category.name}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  {category.type === "income" ? "Entrata" : "Spesa"}
-                                  {category.subcategories && category.subcategories.length > 0 && 
-                                    ` • ${category.subcategories.length} sottocategorie`}
-                                </p>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        );
-                      })}
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="size-2 rounded-full bg-green-500"></div>
+                        <h3 className="text-sm font-medium">Categorie di Entrata ({categories.filter(c => c.type === "income").length})</h3>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                        {categories
+                          .filter(c => c.type === "income")
+                          .map((category, index) => {
+                            const IconComponent = category.icon
+                              ? (LucideIcons as never)[toPascalCase(category.icon)] || LucideIcons.CircleDashed
+                              : category.type === "income"
+                                ? LucideIcons.TrendingUp
+                                : LucideIcons.ShoppingBag;
+
+                            return (
+                              <Card key={index} className={`border-l-4 ${category.type === 'income' ? 'border-l-green-500' : 'border-l-red-500'}`}>
+                                <CardContent className="p-3 flex items-center gap-3">
+                                  <div
+                                    className="flex items-center justify-center h-8 w-8 rounded-full"
+                                    style={{ backgroundColor: category.color || (category.type === "income" ? "#4CAF50" : "#F44336") }}
+                                  >
+                                    <IconComponent className="h-4 w-4 text-white" />
+                                  </div>
+                                  <div>
+                                    <p className="font-medium">{category.name}</p>
+                                    {category.subcategories && category.subcategories.length > 0 &&
+                                      <p className="text-xs text-muted-foreground">
+                                        {category.subcategories.length} sottocategorie
+                                      </p>
+                                    }
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            );
+                          })}
+                      </div>
+
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="size-2 rounded-full bg-red-500"></div>
+                        <h3 className="text-sm font-medium">Categorie di Spesa ({categories.filter(c => c.type === "expense").length})</h3>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {categories
+                          .filter(c => c.type === "expense")
+                          .map((category, index) => {
+                            const IconComponent = category.icon
+                              ? (LucideIcons as never)[toPascalCase(category.icon)] || LucideIcons.CircleDashed
+                              : category.type === "income"
+                                ? LucideIcons.TrendingUp
+                                : LucideIcons.ShoppingBag;
+
+                            return (
+                              <Card key={index} className={`border-l-4 ${category.type === 'income' ? 'border-l-green-500' : 'border-l-red-500'}`}>
+                                <CardContent className="p-3 flex items-center gap-3">
+                                  <div
+                                    className="flex items-center justify-center h-8 w-8 rounded-full"
+                                    style={{ backgroundColor: category.color || (category.type === "income" ? "#4CAF50" : "#F44336") }}
+                                  >
+                                    <IconComponent className="h-4 w-4 text-white" />
+                                  </div>
+                                  <div>
+                                    <p className="font-medium">{category.name}</p>
+                                    {category.subcategories && category.subcategories.length > 0 &&
+                                      <p className="text-xs text-muted-foreground">
+                                        {category.subcategories.length} sottocategorie
+                                      </p>
+                                    }
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            );
+                          })}
+                      </div>
                     </div>
                   )}
                 </div>
               )}
             </CardContent>
           </Card>
+
+          <div className="bg-muted/20 rounded-md p-4">
+            <p className="text-sm text-center text-muted-foreground">
+              Una volta completato l&apos;onboarding, potrai sempre modificare queste impostazioni dal tuo profilo.
+              <br />
+              Sei pronto per iniziare a gestire le tue finanze con Buddy Budget?
+            </p>
+          </div>
         </div>
       ),
     },
@@ -641,7 +841,7 @@ export default function OnboardingPage() {
     ][step];
 
     const isValid = fields.length > 0 ? fields.every(field => {
-      return form.trigger(field as any);
+      return form.trigger(field as keyof typeof form.control._defaultValues);
     }) : true;
 
     if (isValid) {
@@ -662,28 +862,26 @@ export default function OnboardingPage() {
 
   return (
     <div className="container max-w-3xl mx-auto py-8">
-      <div className="flex justify-between items-center">
-
-        <div className="flex items-center">
-          <ThemeToggle />
-        </div>
-      </div>
-
       <div className="mt-8">
         {/* Indicatore di progresso */}
         <div className="mb-8">
           <div className="flex justify-between">
             {steps.map((s, i) => (
               <div key={i} className="flex flex-col items-center">
-                <div 
-                  className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${
-                    i < step ? "bg-primary text-primary-foreground border-primary" : 
-                    i === step ? "border-primary text-primary" : 
-                    "border-muted text-muted-foreground"
-                  }`}
+                <div
+                  className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${i < step ? "bg-primary text-primary-foreground border-primary" :
+                    i === step ? "border-primary text-primary" :
+                      "border-muted text-muted-foreground"
+                    }`}
                 >
                   {i < step ? (
-                    <Check className="h-5 w-5" />
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <Check className="h-5 w-5" />
+                    </motion.div>
                   ) : (
                     <span>{i + 1}</span>
                   )}
@@ -691,6 +889,11 @@ export default function OnboardingPage() {
                 <span className={`text-sm mt-2 ${i === step ? "font-medium" : "text-muted-foreground"}`}>
                   {s.title}
                 </span>
+                {s.description && (
+                  <span className="text-xs text-muted-foreground hidden md:block">
+                    {i === step && s.description}
+                  </span>
+                )}
               </div>
             ))}
           </div>
@@ -699,9 +902,11 @@ export default function OnboardingPage() {
               <div className="w-full h-1 bg-muted rounded-full" />
             </div>
             <div className="absolute inset-0 flex items-center">
-              <div 
-                className="h-1 bg-primary rounded-full transition-all duration-300" 
-                style={{ width: `${(step / (steps.length - 1)) * 100}%` }}
+              <motion.div
+                className="h-1 bg-primary rounded-full transition-all"
+                initial={{ width: `${(0 / (steps.length - 1)) * 100}%` }}
+                animate={{ width: `${(step / (steps.length - 1)) * 100}%` }}
+                transition={{ duration: 0.5, ease: "easeInOut" }}
               />
             </div>
           </div>
@@ -747,28 +952,42 @@ export default function OnboardingPage() {
                     <ArrowRight className="h-4 w-4" />
                   </Button>
                 ) : (
-                  <Button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="flex items-center gap-2"
+                  <motion.div
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.98 }}
                   >
-                    {isSubmitting ? "Salvataggio..." : "Completa Onboarding"}
-                    <Check className="h-4 w-4" />
-                  </Button>
+                    <Button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="flex items-center gap-2 relative"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-1"></div>
+                          Salvataggio...
+                        </>
+                      ) : (
+                        <>
+                          Completa Onboarding
+                          <Check className="h-4 w-4" />
+                        </>
+                      )}
+                    </Button>
+                  </motion.div>
                 )}
               </CardFooter>
             </Card>
           </form>
         </Form>
       </div>
-      
+
       {/* Confirmation Dialog */}
       <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Conferma Configurazione</DialogTitle>
             <DialogDescription>
-              Sei sicuro di voler completare l'onboarding con queste impostazioni? Potrai sempre modificarle in seguito dalle impostazioni del tuo profilo.
+              Sei sicuro di voler completare l&apos;onboarding con queste impostazioni? Potrai sempre modificarle in seguito dalle impostazioni del tuo profilo.
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col space-y-4 py-3">
@@ -779,12 +998,12 @@ export default function OnboardingPage() {
               <div>
                 <p className="text-sm font-medium">Riepilogo della tua configurazione</p>
                 <p className="text-xs text-muted-foreground">
-                  Lingua: {form.getValues("language") === "it" ? "Italiano" : "English"} • 
+                  Lingua: {form.getValues("language") === "it" ? "Italiano" : "English"} •
                   Valuta: {form.getValues("primaryCurrency")}
                 </p>
               </div>
             </div>
-            
+
             <div className="border-t pt-3">
               <p className="text-sm font-medium mb-1">Conti di Liquidità ({accounts.length})</p>
               <div className="max-h-20 overflow-y-auto text-xs text-muted-foreground space-y-1">
@@ -792,20 +1011,17 @@ export default function OnboardingPage() {
                   <div key={index} className="flex justify-between">
                     <span>{account.name}</span>
                     <span>
-                      {account.balance.toFixed(2)} 
-                      {form.getValues("primaryCurrency") === "EUR" && "€"}
-                      {form.getValues("primaryCurrency") === "USD" && "$"}
-                      {form.getValues("primaryCurrency") === "GBP" && "£"}
+                      {formatCurrency(account.balance, form.getValues("primaryCurrency"))}
                     </span>
                   </div>
                 ))}
               </div>
             </div>
-            
+
             <div className="border-t pt-3">
               <p className="text-sm font-medium mb-1">
-                Categorie {useDefaultCategories 
-                  ? `(${defaultCategories.length} predefinite)` 
+                Categorie {useDefaultCategories
+                  ? `(${defaultCategories.length} predefinite)`
                   : `(${categories.length} personalizzate)`}
               </p>
               <div className="max-h-28 overflow-y-auto text-xs text-muted-foreground">
@@ -821,7 +1037,7 @@ export default function OnboardingPage() {
                         <span>{category.name || "(Senza nome)"}</span>
                         <span className={category.type === "income" ? "text-green-600" : "text-red-600"}>
                           {category.type === "income" ? "Entrata" : "Spesa"}
-                          {category.subcategories && category.subcategories.length > 0 && 
+                          {category.subcategories && category.subcategories.length > 0 &&
                             ` (${category.subcategories.length})`}
                         </span>
                       </div>
@@ -840,7 +1056,7 @@ export default function OnboardingPage() {
             >
               Torna indietro
             </Button>
-            <Button 
+            <Button
               type="button"
               onClick={handleConfirmedSubmit}
               disabled={isSubmitting}

@@ -2,59 +2,6 @@ import { NextResponse } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 import type { NextRequest } from 'next/server'
 
-// Configurazione delle route
-const publicRoutes = [
-  '/',
-  '/auth/login',
-  '/auth/register',
-  '/auth/password-reset',
-  '/terms',
-  '/privacy',
-  '/support',
-  '/api/auth/register',
-  '/api/auth/password-reset/request',
-  '/api/auth/password-reset/verify',
-  '/api/auth/password-reset/reset',
-  '/api/contact'
-]
-
-// Route di NextAuth che devono essere sempre accessibili
-const nextAuthRoutes = [
-  '/api/auth/signin',
-  '/api/auth/signout',
-  '/api/auth/session',
-  '/api/auth/providers',
-  '/api/auth/csrf',
-  '/api/auth/callback',
-  '/api/auth/credentials'
-]
-
-const authRoutes = [
-  '/auth/login',
-  '/auth/register',
-  '/auth/password-reset'
-]
-
-// Controlla se una route è pubblica
-const isPublicRoute = (path: string) => {
-  return publicRoutes.some(route => path === route || path.startsWith(`${route}/`))
-}
-
-// Controlla se una route è di NextAuth
-const isNextAuthRoute = (path: string) => {
-  return nextAuthRoutes.some(route => path === route || path.startsWith(`${route}/`))
-}
-
-// Controlla se una route è di autenticazione
-const isAuthRoute = (path: string) => {
-  return authRoutes.some(route => path === route || path.startsWith(`${route}/`))
-}
-
-// Controlla se una route è un'API
-const isApiRoute = (path: string) => {
-  return path.startsWith('/api/')
-}
-
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
@@ -68,6 +15,9 @@ export async function middleware(request: NextRequest) {
     "/auth/register",
     "/auth/password-reset",
     "/api/auth",
+    '/terms',
+    '/privacy',
+    '/policy'
   ];
   
   // Verifica se il percorso è pubblico
@@ -78,6 +28,23 @@ export async function middleware(request: NextRequest) {
   // Gestione delle API
   if (pathname.startsWith("/api")) {
     return NextResponse.next();
+  }
+  
+  // Check if token exists but is invalid (user deleted or doesn't exist anymore)
+  if (isAuthenticated && token.isValid === false) {
+    // Save the current URL for redirection after login
+    const redirectUrl = new URL("/auth/login", request.url);
+    if (!isPublicPath) {
+      redirectUrl.searchParams.set("callbackUrl", encodeURI(pathname));
+    }
+    
+    // Clear the auth cookies
+    const response = NextResponse.redirect(redirectUrl);
+    response.cookies.delete("next-auth.session-token");
+    response.cookies.delete("next-auth.csrf-token");
+    response.cookies.delete("next-auth.callback-url");
+    
+    return response;
   }
   
   // Reindirizza gli utenti non autenticati alla pagina di login
@@ -94,7 +61,6 @@ export async function middleware(request: NextRequest) {
   
   // Gestione dell'onboarding
   if (isAuthenticated && !pathname.startsWith("/onboarding")) {
-    // @ts-ignore - Il token può avere proprietà personalizzate
     const hasCompletedOnboarding = token.hasCompletedOnboarding;
     
     // Se l'utente non ha completato l'onboarding, reindirizzalo alla pagina di onboarding
@@ -105,7 +71,6 @@ export async function middleware(request: NextRequest) {
   
   // Se l'utente ha completato l'onboarding e tenta di accedere alla pagina di onboarding, reindirizzalo alla dashboard
   if (isAuthenticated && pathname === "/onboarding") {
-    // @ts-ignore - Il token può avere proprietà personalizzate
     const hasCompletedOnboarding = token.hasCompletedOnboarding;
     
     if (hasCompletedOnboarding === true) {

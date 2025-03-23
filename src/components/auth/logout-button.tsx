@@ -1,10 +1,10 @@
 'use client'
 
-import { Button, ButtonProps } from '@/components/ui/button'
+import { Button } from '@/components/ui/button'
 import { signOut } from 'next-auth/react'
 import { LogOut } from 'lucide-react'
 
-interface LogoutButtonProps extends ButtonProps {
+interface LogoutButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   showIcon?: boolean
 }
 

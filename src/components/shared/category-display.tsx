@@ -45,7 +45,7 @@ export function CategoryDisplay({
   onClick,
   className
 }: CategoryDisplayProps) {
-  const IconComponent = (LucideIcons as any)[toPascalCase(category.icon)] || LucideIcons.CircleDashed;
+  const IconComponent: React.FC<React.SVGProps<SVGSVGElement>> = (LucideIcons as never)[toPascalCase(category.icon)] || LucideIcons.CircleDashed;
   const hasSubcategories = category.subcategories && category.subcategories.length > 0;
   
   return (

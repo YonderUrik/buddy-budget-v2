@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
-import { SUPPORT_EMAIL } from '@/lib/config';
 
 // Inizializza Resend con la chiave API
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -19,7 +18,7 @@ export async function POST(request: Request) {
       }
 
       // Invia l'email usando Resend
-      const { data, error } = await resend.emails.send({
+      const { error } = await resend.emails.send({
          from: `Contatto ${name} <noreply@${process.env.NEXT_PUBLIC_APP_DOMAIN || 'buddybudget.net'}>`,
          to: "roccafortedaniele28@gmail.com",
          subject: `Nuovo messaggio di contatto: ${subject}`,

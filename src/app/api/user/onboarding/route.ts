@@ -12,7 +12,7 @@ const onboardingSchema = z.object({
     z.object({
       name: z.string().min(1),
       type: z.enum(["checking", "savings", "cash", "other"]),
-      balance: z.number().min(0),
+      balance: z.number().min(0).transform(value => parseFloat(value.toFixed(2))),
     })
   ).min(1),
   categories: z.array(
@@ -44,6 +44,7 @@ export async function POST(request: Request) {
 
     // Ottieni i dati dalla richiesta
     const body = await request.json();
+
     const { language, primaryCurrency, liquidityAccounts, categories } = onboardingSchema.parse(body);
 
     // Ottieni l'utente dal database
@@ -67,10 +68,7 @@ export async function POST(request: Request) {
       },
       data: {
         settings: {
-          language,
-          notificationPreferences: user.settings && typeof user.settings === 'object' && 'notificationPreferences' in user.settings 
-            ? user.settings.notificationPreferences 
-            : { email: true, push: true }
+          language
         },
         primaryCurrency,
         hasCompletedOnboarding: true,
@@ -122,7 +120,7 @@ export async function POST(request: Request) {
         }
       }
    } else {
-      console.error("No categories provided")
+      console.warn("No categories provided")
    }
 
 

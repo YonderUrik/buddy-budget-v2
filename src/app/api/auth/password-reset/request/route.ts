@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { Resend } from "resend";
 import crypto from "crypto";
+import { APP_NAME } from "@/lib/config";
 
 // Inizializza Resend
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -62,15 +63,15 @@ export async function POST(request: Request) {
       subject: "Codice di verifica per il reset della password",
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2>Recupero Password - Buddy Budget</h2>
-          <p>Hai richiesto il reset della password per il tuo account Buddy Budget.</p>
+          <h2>Recupero Password - ${APP_NAME}</h2>
+          <p>Hai richiesto il reset della password per il tuo account ${APP_NAME}.</p>
           <p>Ecco il tuo codice di verifica:</p>
           <div style="background-color: #f4f4f4; padding: 15px; text-align: center; font-size: 24px; letter-spacing: 5px; font-weight: bold; margin: 20px 0;">
             ${token}
           </div>
           <p>Questo codice scadrà tra 30 minuti.</p>
           <p>Se non hai richiesto il reset della password, ignora questa email.</p>
-          <p>Grazie,<br>Il team di Buddy Budget</p>
+          <p>Grazie,<br>Il team di ${APP_NAME}</p>
         </div>
       `,
     });

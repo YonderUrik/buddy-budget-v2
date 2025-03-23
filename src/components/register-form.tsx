@@ -5,9 +5,11 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Eye, EyeOff } from "lucide-react"
+import { Eye, EyeOff, Check, X } from "lucide-react"
+import { APP_NAME } from "@/lib/config";
+import Image from "next/image";
 
 export function RegisterForm({
   className,
@@ -21,10 +23,47 @@ export function RegisterForm({
   const [showPassword, setShowPassword] = useState(false)
   const router = useRouter()
 
+  // Password validation states
+  const [passwordValidation, setPasswordValidation] = useState({
+    hasMinLength: false,
+    hasUppercase: false,
+    hasLowercase: false,
+    hasNumber: false,
+    hasSpecial: false
+  })
+
+  // Update password validation on password change
+  useEffect(() => {
+    setPasswordValidation({
+      hasMinLength: password.length >= 8,
+      hasUppercase: /[A-Z]/.test(password),
+      hasLowercase: /[a-z]/.test(password),
+      hasNumber: /[0-9]/.test(password),
+      hasSpecial: /[^A-Za-z0-9]/.test(password)
+    })
+  }, [password])
+
+  // Calculate password strength
+  const passwordStrength = Object.values(passwordValidation).filter(Boolean).length
+
+  // Get password strength indicator color
+  const getStrengthColor = () => {
+    if (passwordStrength <= 2) return "bg-red-500"
+    if (passwordStrength <= 4) return "bg-yellow-500"
+    return "bg-green-500"
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setError("")
+
+    // Validate password
+    if (passwordStrength < 5) {
+      setError("La password non soddisfa i requisiti minimi di sicurezza")
+      setIsLoading(false)
+      return
+    }
 
     try {
       const response = await fetch("/api/auth/register", {
@@ -49,8 +88,9 @@ export function RegisterForm({
 
       // Redirect to login page on successful registration
       router.push("/auth/login?registered=true")
-    } catch (error) {
+    } catch (err) {
       setError("Si è verificato un errore durante la registrazione. Riprova.")
+      console.error("Registration error:", err)
       setIsLoading(false)
     }
   }
@@ -64,7 +104,7 @@ export function RegisterForm({
               <div className="flex flex-col items-center text-center">
                 <h1 className="text-2xl font-bold">Crea un account</h1>
                 <p className="text-muted-foreground text-balance">
-                  Registrati per iniziare a usare Buddy Budget
+                  Registrati per iniziare a usare {APP_NAME}
                 </p>
               </div>
               {error && (
@@ -97,10 +137,10 @@ export function RegisterForm({
               <div className="grid gap-3">
                 <Label htmlFor="password">Password</Label>
                 <div className="relative">
-                  <Input 
-                    id="password" 
+                  <Input
+                    id="password"
                     type={showPassword ? "text" : "password"}
-                    required 
+                    required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                   />
@@ -119,9 +159,50 @@ export function RegisterForm({
                     </span>
                   </button>
                 </div>
-                <p className="text-muted-foreground text-xs">
-                  La password deve contenere almeno 8 caratteri
-                </p>
+
+                {/* Password strength meter */}
+                <div className="space-y-2">
+                  <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full ${getStrengthColor()} transition-all duration-300`}
+                      style={{ width: `${(passwordStrength / 5) * 100}%` }}
+                    />
+                  </div>
+
+                  {/* Password requirements */}
+                  <ul className="space-y-1 text-xs">
+                    <li className="flex items-center gap-1.5">
+                      {passwordValidation.hasMinLength ?
+                        <Check className="h-3.5 w-3.5 text-green-500" /> :
+                        <X className="h-3.5 w-3.5 text-red-500" />}
+                      Almeno 8 caratteri
+                    </li>
+                    <li className="flex items-center gap-1.5">
+                      {passwordValidation.hasUppercase ?
+                        <Check className="h-3.5 w-3.5 text-green-500" /> :
+                        <X className="h-3.5 w-3.5 text-red-500" />}
+                      Almeno una lettera maiuscola (A-Z)
+                    </li>
+                    <li className="flex items-center gap-1.5">
+                      {passwordValidation.hasLowercase ?
+                        <Check className="h-3.5 w-3.5 text-green-500" /> :
+                        <X className="h-3.5 w-3.5 text-red-500" />}
+                      Almeno una lettera minuscola (a-z)
+                    </li>
+                    <li className="flex items-center gap-1.5">
+                      {passwordValidation.hasNumber ?
+                        <Check className="h-3.5 w-3.5 text-green-500" /> :
+                        <X className="h-3.5 w-3.5 text-red-500" />}
+                      Almeno un numero (0-9)
+                    </li>
+                    <li className="flex items-center gap-1.5">
+                      {passwordValidation.hasSpecial ?
+                        <Check className="h-3.5 w-3.5 text-green-500" /> :
+                        <X className="h-3.5 w-3.5 text-red-500" />}
+                      Almeno un carattere speciale
+                    </li>
+                  </ul>
+                </div>
               </div>
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? "Registrazione in corso..." : "Registrati"}
@@ -135,10 +216,12 @@ export function RegisterForm({
             </div>
           </form>
           <div className="bg-muted relative hidden md:block">
-            <img
-              src="/placeholder.svg"
+            <Image
+              src="/placeholder.jpg"
+              width={1920}
+              height={1080}
               alt="Image"
-              className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
+              className="absolute inset-0 h-full w-full object-fit dark:brightness-[0.5]"
             />
           </div>
         </CardContent>

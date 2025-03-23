@@ -12,7 +12,7 @@ export const defaultCategories: CategoryItem[] = [
     icon: "banknote", 
     color: "#4CAF50",
     subcategories: [
-      { name: "Stipendio Principale" },
+      { name: "Lavoro Full-time" },
       { name: "Lavoro Part-time" }
     ]
   },
@@ -38,14 +38,15 @@ export const defaultCategories: CategoryItem[] = [
     ]
   },
   { 
-    name: "Affitto/Mutuo", 
+    name: "Casa", 
     type: "expense", 
     icon: "home", 
     color: "#F44336",
     subcategories: [
       { name: "Affitto" },
       { name: "Mutuo" },
-      { name: "Spese Condominiali" }
+      { name: "Spese Condominiali" },
+      { name: "Mobili" },
     ]
   },
   { 
@@ -54,9 +55,10 @@ export const defaultCategories: CategoryItem[] = [
     icon: "shopping-cart", 
     color: "#FF9800",
     subcategories: [
-      { name: "Supermercato" },
-      { name: "Mercato" },
-      { name: "Prodotti Biologici" }
+      { name: "Spesa" },
+      { name: "Mangiare fuori" },
+      { name: "Bar" },
+      { name: "Aperitivi" },
     ]
   },
   { 
@@ -67,7 +69,9 @@ export const defaultCategories: CategoryItem[] = [
     subcategories: [
       { name: "Carburante" },
       { name: "Trasporto Pubblico" },
-      { name: "Manutenzione Auto" },
+      { name: "Manutenzione" },
+      { name: "Aerei/Treni/Bus" },
+      { name: "Car sharing" },
       { name: "Assicurazione" }
     ]
   },
@@ -81,7 +85,7 @@ export const defaultCategories: CategoryItem[] = [
       { name: "Gas" },
       { name: "Acqua" },
       { name: "Internet" },
-      { name: "Telefono" }
+      { name: "Telefono" },
     ]
   },
   { 
@@ -91,7 +95,6 @@ export const defaultCategories: CategoryItem[] = [
     color: "#9C27B0",
     subcategories: [
       { name: "Cinema" },
-      { name: "Ristoranti" },
       { name: "Viaggi" },
       { name: "Abbonamenti" }
     ]
@@ -143,7 +146,7 @@ export function DefaultCategories({ showSubcategories = false, compact = false }
           value="expense"
           className="data-[state=active]:bg-red-50 data-[state=active]:text-red-700 data-[state=active]:border-red-200"
         >
-          Spese
+          Uscite
         </TabsTrigger>
       </TabsList>
       

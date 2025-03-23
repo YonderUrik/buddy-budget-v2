@@ -1,9 +1,10 @@
 import { RegisterForm } from "@/components/register-form"
+import { APP_NAME } from "@/lib/config"
 import { Metadata } from "next"
 
 export const metadata: Metadata = {
-  title: "Registrazione - Buddy Budget",
-  description: "Crea un nuovo account Buddy Budget",
+  title: `Registrazione - ${APP_NAME}`,
+  description: `Crea un nuovo account ${APP_NAME}`,
 }
 
 export default function RegisterPage() {

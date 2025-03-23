@@ -9,6 +9,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AlertCircle, CheckCircle2, Eye, EyeOff } from "lucide-react"
+import Image from "next/image";
 
 export function PasswordResetForm({
   className,
@@ -53,6 +54,7 @@ export function PasswordResetForm({
       setStep('verify')
       setIsLoading(false)
     } catch (error) {
+      console.error(error)
       setError("Si è verificato un errore durante l'invio del codice. Riprova.")
       setIsLoading(false)
     }
@@ -85,6 +87,7 @@ export function PasswordResetForm({
       setStep('reset')
       setIsLoading(false)
     } catch (error) {
+      console.error(error)
       setError("Si è verificato un errore durante la verifica del codice. Riprova.")
       setIsLoading(false)
     }
@@ -130,6 +133,7 @@ export function PasswordResetForm({
         router.push("/auth/login?reset=success")
       }, 2000)
     } catch (error) {
+      console.error(error)
       setError("Si è verificato un errore durante il reset della password. Riprova.")
       setIsLoading(false)
     }
@@ -159,7 +163,7 @@ export function PasswordResetForm({
               )}
 
               {success && (
-                <Alert variant="success" className="bg-green-50 text-green-800 border-green-200">
+                <Alert className="bg-green-50 text-green-800 border-green-200">
                   <CheckCircle2 className="h-4 w-4 text-green-600" />
                   <AlertTitle>Successo</AlertTitle>
                   <AlertDescription>{success}</AlertDescription>
@@ -211,8 +215,8 @@ export function PasswordResetForm({
                     {isLoading ? "Verifica in corso..." : "Verifica codice"}
                   </Button>
                   <div className="text-center text-sm">
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       onClick={() => setStep('request')}
                       className="underline underline-offset-4 text-sm"
                     >
@@ -283,8 +287,8 @@ export function PasswordResetForm({
                     {isLoading ? "Reset in corso..." : "Reimposta password"}
                   </Button>
                   <div className="text-center text-sm">
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       onClick={() => setStep('verify')}
                       className="underline underline-offset-4 text-sm"
                     >
@@ -296,8 +300,10 @@ export function PasswordResetForm({
             </div>
           </div>
           <div className="bg-muted relative hidden md:block">
-            <img
-              src="/placeholder.svg"
+            <Image
+              width={1920}
+              height={1080}
+              src="/placeholder.jpg"
               alt="Image"
               className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
             />
