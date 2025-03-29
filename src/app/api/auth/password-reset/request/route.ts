@@ -3,7 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { Resend } from "resend";
 import crypto from "crypto";
-import { APP_NAME } from "@/lib/config";
+import { APP_NAME, APP_DOMAIN } from "@/lib/config";
 
 // Inizializza Resend
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -12,6 +12,23 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 const requestSchema = z.object({
   email: z.string().email({ message: "Email non valida" }),
 });
+
+// Funzione per validare e costruire l'indirizzo email del mittente
+function getSenderEmail(mail_name : string): string {
+  if (!APP_DOMAIN) {
+    throw new Error("APP_DOMAIN non è definito nella configurazione");
+  }
+
+  // Rimuovi eventuali spazi e caratteri non validi
+  const cleanDomain = APP_DOMAIN.trim().toLowerCase();
+  
+  // Valida il dominio
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9](?:\.[a-zA-Z]{2,})+$/.test(cleanDomain)) {
+    throw new Error("Il dominio configurato non è valido");
+  }
+
+  return `${mail_name}@${cleanDomain}`;
+}
 
 export async function POST(request: Request) {
   try {
@@ -35,7 +52,7 @@ export async function POST(request: Request) {
 
     // Genera un token casuale di 6 cifre
     const token = crypto.randomInt(100000, 999999).toString();
-    
+
     // Calcola la data di scadenza (30 minuti)
     const expires = new Date();
     expires.setMinutes(expires.getMinutes() + 30);
@@ -56,9 +73,12 @@ export async function POST(request: Request) {
       },
     });
 
-    // Invia l'email con il codice di verifica
+    // Ottieni e valida l'indirizzo email del mittente
+    const senderEmail = getSenderEmail("noreply");
+    
+    // TODO : Migliorare l'estetica dell'html
     await resend.emails.send({
-      from: "noreply@buddybudget.net",
+      from: senderEmail,
       to: email,
       subject: "Codice di verifica per il reset della password",
       html: `
@@ -82,14 +102,22 @@ export async function POST(request: Request) {
     );
   } catch (error) {
     console.error("Errore durante la richiesta di reset della password:", error);
-    
+
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { message: "Dati non validi", errors: error.errors },
         { status: 400 }
       );
     }
-    
+
+    // Gestione specifica degli errori di configurazione
+    if (error instanceof Error && error.message.includes("APP_DOMAIN")) {
+      return NextResponse.json(
+        { message: "Errore di configurazione: dominio email non valido" },
+        { status: 500 }
+      );
+    }
+
     return NextResponse.json(
       { message: "Si è verificato un errore durante la richiesta di reset della password" },
       { status: 500 }
