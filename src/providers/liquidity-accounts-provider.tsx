@@ -1,4 +1,5 @@
 'use client';
+import axios from "axios";
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 
 // Define the type for a liquidity account based on Prisma schema
@@ -43,12 +44,10 @@ export function LiquidityAccountProvider({ children }: LiquidityAccountProviderP
   const fetchAccounts = async () => {
     try {
       setLoading(true);
-      // Replace this with your actual API call
-      const response = await fetch('/api/liquidity-accounts');
-      if (!response.ok) {
-        throw new Error('Failed to fetch liquidity accounts');
-      }
-      const data = await response.json();
+      const response = await axios.get('/api/liquidity-accounts');
+    
+      const data = response.data;
+      
       setAccounts(data);
       setError(null);
     } catch (err) {
@@ -62,19 +61,8 @@ export function LiquidityAccountProvider({ children }: LiquidityAccountProviderP
   // Add a new account
   const addAccount = async (account: Omit<LiquidityAccount, "id" | "createdAt" | "updatedAt" | "isDeleted" | "deletedAt">) => {
     try {
-      const response = await fetch('/api/liquidity-accounts', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(account),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to add liquidity account');
-      }
-
-      const newAccount = await response.json();
+      const response = await axios.post('/api/liquidity-accounts', account);
+      const newAccount = response.data;
       setAccounts((prevAccounts) => [...prevAccounts, newAccount]);
       return newAccount;
     } catch (err) {
@@ -87,19 +75,9 @@ export function LiquidityAccountProvider({ children }: LiquidityAccountProviderP
   // Update an existing account
   const updateAccount = async (id: string, accountData: Partial<LiquidityAccount>) => {
     try {
-      const response = await fetch(`/api/liquidity-accounts/${id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(accountData),
-      });
+      const response = await axios.patch(`/api/liquidity-accounts/${id}`, accountData);
 
-      if (!response.ok) {
-        throw new Error('Failed to update liquidity account');
-      }
-
-      const updatedAccount = await response.json();
+      const updatedAccount = response.data;
       setAccounts((prevAccounts) =>
         prevAccounts.map((account) => 
           account.id === id ? updatedAccount : account
@@ -116,13 +94,7 @@ export function LiquidityAccountProvider({ children }: LiquidityAccountProviderP
   // Delete an account (soft delete)
   const deleteAccount = async (id: string) => {
     try {
-      const response = await fetch(`/api/liquidity-accounts/${id}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to delete liquidity account');
-      }
+      await axios.delete(`/api/liquidity-accounts/${id}`);
 
       // After successful delete, update local state
       setAccounts((prevAccounts) =>

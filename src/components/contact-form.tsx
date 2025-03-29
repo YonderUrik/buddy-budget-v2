@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { SUPPORT_EMAIL } from "@/lib/config"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AlertCircle, CheckCircle2 } from "lucide-react"
+import axios from "axios"
 
 interface ContactFormProps {
   className?: string
@@ -36,28 +37,16 @@ export function ContactForm({ className }: ContactFormProps) {
 
     try {
       // Invia i dati all'API
-      const response = await fetch('/api/contact', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ name, email, subject, message }),
-      });
+      const response = await axios.post('/api/contact', { name, email, subject, message });
 
-      const data = await response.json();
+      const data = response.data;
 
-      if (!response.ok) {
-        setError(data.error || 'Si è verificato un errore durante l\'invio del messaggio');
-        setIsLoading(false);
-        return;
-      }
-      
       // Resetta il form
       setName("")
       setEmail("")
       setSubject("")
       setMessage("")
-      
+
       // Mostra messaggio di successo
       setSuccess(data.message || `Grazie per averci contattato! Ti risponderemo al più presto all'indirizzo ${email}.`)
       setIsLoading(false)
@@ -77,7 +66,7 @@ export function ContactForm({ className }: ContactFormProps) {
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
-      
+
       {success && (
         <Alert className="mb-4 border-green-500 text-green-500">
           <CheckCircle2 className="h-4 w-4" />
@@ -85,14 +74,14 @@ export function ContactForm({ className }: ContactFormProps) {
           <AlertDescription>{success}</AlertDescription>
         </Alert>
       )}
-      
+
       <form className="space-y-4" onSubmit={handleSubmit}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label htmlFor="name" className="block text-sm font-medium mb-1">Nome</label>
-            <Input 
-              id="name" 
-              placeholder="Il tuo nome" 
+            <Input
+              id="name"
+              placeholder="Il tuo nome"
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
@@ -100,10 +89,10 @@ export function ContactForm({ className }: ContactFormProps) {
           </div>
           <div>
             <label htmlFor="email" className="block text-sm font-medium mb-1">Email</label>
-            <Input 
-              id="email" 
-              type="email" 
-              placeholder="La tua email" 
+            <Input
+              id="email"
+              type="email"
+              placeholder="La tua email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -112,9 +101,9 @@ export function ContactForm({ className }: ContactFormProps) {
         </div>
         <div>
           <label htmlFor="subject" className="block text-sm font-medium mb-1">Oggetto</label>
-          <Input 
-            id="subject" 
-            placeholder="Oggetto del messaggio" 
+          <Input
+            id="subject"
+            placeholder="Oggetto del messaggio"
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
             required
@@ -122,10 +111,10 @@ export function ContactForm({ className }: ContactFormProps) {
         </div>
         <div>
           <label htmlFor="message" className="block text-sm font-medium mb-1">Messaggio</label>
-          <Textarea 
-            id="message" 
-            placeholder="Descrivi il tuo problema o la tua domanda" 
-            rows={5} 
+          <Textarea
+            id="message"
+            placeholder="Descrivi il tuo problema o la tua domanda"
+            rows={5}
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             required

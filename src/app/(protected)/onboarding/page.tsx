@@ -233,12 +233,7 @@ export default function OnboardingPage() {
         categories: useDefaultCategories ? defaultCategories : formValues.categories
       };
 
-      const response = await axios.post("/api/user/onboarding", formData);
-
-      // Check for response status
-      if (response.status !== 200) {
-        throw new Error(response.data.message || "Si è verificato un errore durante l'onboarding");
-      }
+      await axios.post("/api/user/onboarding", formData);
 
       // Aggiorna la sessione per riflettere che l'onboarding è stato completato
       await update({ hasCompletedOnboarding: true });

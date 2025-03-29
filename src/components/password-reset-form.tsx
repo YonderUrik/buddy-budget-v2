@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AlertCircle, CheckCircle2, Eye, EyeOff } from "lucide-react"
 import Image from "next/image";
+import axios from "axios";
 
 export function PasswordResetForm({
   className,
@@ -34,21 +35,8 @@ export function PasswordResetForm({
     setSuccess("")
 
     try {
-      const response = await fetch("/api/auth/password-reset/request", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email }),
-      })
+      await axios.post("/api/auth/password-reset/request", { email });
 
-      const data = await response.json()
-
-      if (!response.ok) {
-        setError(data.message || "Si è verificato un errore durante l'invio del codice")
-        setIsLoading(false)
-        return
-      }
 
       setSuccess("Codice di verifica inviato alla tua email")
       setStep('verify')
@@ -67,21 +55,7 @@ export function PasswordResetForm({
     setSuccess("")
 
     try {
-      const response = await fetch("/api/auth/password-reset/verify", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, code }),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        setError(data.message || "Codice di verifica non valido")
-        setIsLoading(false)
-        return
-      }
+      await axios.post("/api/auth/password-reset/verify", { email, code });
 
       setSuccess("Codice verificato con successo")
       setStep('reset')
@@ -112,21 +86,7 @@ export function PasswordResetForm({
     }
 
     try {
-      const response = await fetch("/api/auth/password-reset/reset", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, code, password: newPassword }),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        setError(data.message || "Si è verificato un errore durante il reset della password")
-        setIsLoading(false)
-        return
-      }
+      await axios.post("/api/auth/password-reset/reset", { email, code, password: newPassword });
 
       setSuccess("Password reimpostata con successo")
       setTimeout(() => {

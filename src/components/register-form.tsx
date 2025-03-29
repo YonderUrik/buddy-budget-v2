@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation"
 import { Eye, EyeOff, Check, X } from "lucide-react"
 import { APP_NAME } from "@/lib/config";
 import Image from "next/image";
+import axios from "axios";
 
 export function RegisterForm({
   className,
@@ -66,25 +67,11 @@ export function RegisterForm({
     }
 
     try {
-      const response = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name,
-          email,
-          password,
-        }),
+      await axios.post("/api/auth/register", {
+        name,
+        email,
+        password,
       })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        setError(data.message || "Si è verificato un errore durante la registrazione")
-        setIsLoading(false)
-        return
-      }
 
       // Redirect to login page on successful registration
       router.push("/auth/login?registered=true")

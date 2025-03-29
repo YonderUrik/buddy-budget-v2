@@ -10,7 +10,7 @@ const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: APP_NAME,
-  description: "Track your finances and build wealth",
+  description: "Tieni traccia delle tue finanze e costruisci ricchezza",
   icons: {
     icon: "/favicon.ico", // Insert favicon here
   },

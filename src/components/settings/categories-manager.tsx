@@ -7,20 +7,20 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CategoryType, CategoryDisplay } from "@/components/shared/category-display";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Plus, 
-  Search, 
-  Edit, 
-  Trash2, 
-  ArrowUp, 
-  ArrowDown, 
+import {
+  Plus,
+  Search,
+  Edit,
+  Trash2,
+  ArrowUp,
+  ArrowDown,
   AlertCircle,
   X,
   CheckCircle2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { 
-  Dialog, 
+import {
+  Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -28,7 +28,7 @@ import {
   DialogTitle
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { 
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -38,7 +38,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { 
+import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -47,6 +47,7 @@ import {
 import { ColorPalette } from "@/components/shared/color-palette";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import * as LucideIcons from "lucide-react";
+import axios from "axios";
 
 type Category = {
   id: string;
@@ -95,7 +96,7 @@ const commonIcons = [
   { value: "zap", label: "Elettricità" },
 ];
 
-export function CategoriesManager({ 
+export function CategoriesManager({
   initialCategories
 }: CategoriesManagerProps) {
   const router = useRouter();
@@ -128,11 +129,11 @@ export function CategoriesManager({
     const matchesType = activeTab === "all" || category.type === activeTab;
     return matchesSearch && matchesType && !category.isDeleted;
   });
-  
+
   // Group categories by parent
   const parentCategories = filteredCategories.filter(cat => cat.parentId === null);
   const childCategories = filteredCategories.filter(cat => cat.parentId !== null);
-  
+
   // Create a hierarchical structure
   const hierarchicalCategories = parentCategories.map(parent => {
     const children = childCategories.filter(child => child.parentId === parent.id);
@@ -145,33 +146,22 @@ export function CategoriesManager({
   // Handler for editing a category
   const handleEditCategory = async () => {
     if (!selectedCategory) return;
-    
+
     setIsSubmitting(true);
     try {
-      const response = await fetch(`/api/settings/categories/${selectedCategory.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: selectedCategory.name,
-          icon: selectedCategory.icon,
-          color: selectedCategory.color,
-          type: selectedCategory.type
-        }),
+      await axios.put(`/api/settings/categories/${selectedCategory.id}`, {
+        name: selectedCategory.name,
+        icon: selectedCategory.icon,
+        color: selectedCategory.color,
+        type: selectedCategory.type
       });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Si è verificato un errore durante l\'aggiornamento');
-      }
-      
+
+
       // Update local state
-      setCategories(categories.map(cat => 
+      setCategories(categories.map(cat =>
         cat.id === selectedCategory.id ? selectedCategory : cat
       ));
-      
+
       setIsEditDialogOpen(false);
       toast.success("Categoria aggiornata con successo");
       router.refresh();
@@ -182,28 +172,20 @@ export function CategoriesManager({
       setIsSubmitting(false);
     }
   };
-  
+
   // Handler for deleting a category
   const handleDeleteCategory = async () => {
     if (!categoryToDelete) return;
-    
+
     setIsSubmitting(true);
     try {
-      const response = await fetch(`/api/settings/categories/${categoryToDelete.id}`, {
-        method: 'DELETE',
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Si è verificato un errore durante l\'eliminazione');
-      }
-      
+      await axios.delete(`/api/settings/categories/${categoryToDelete.id}`);
+
       // Update local state
-      setCategories(categories.map(cat => 
+      setCategories(categories.map(cat =>
         cat.id === categoryToDelete.id ? { ...cat, isDeleted: true } : cat
       ));
-      
+
       setIsDeleteDialogOpen(false);
       toast.success("Categoria eliminata con successo");
       router.refresh();
@@ -215,39 +197,27 @@ export function CategoriesManager({
       setCategoryToDelete(null);
     }
   };
-  
+
   // Handler for creating a new category
   const handleCreateCategory = async () => {
     if (!newCategory.name) {
       toast.error("Il nome della categoria è obbligatorio");
       return;
     }
-    
+
     setIsSubmitting(true);
     try {
-      const response = await fetch('/api/settings/categories', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(newCategory),
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Si è verificato un errore durante la creazione');
-      }
-      
+      const response = await axios.post('/api/settings/categories', newCategory);
+
       // Add the new category to local state if returned
-      if (data.category) {
-        setCategories([...categories, data.category]);
+      if (response.data.category) {
+        setCategories([...categories, response.data.category]);
       }
-      
+
       setIsCreateDialogOpen(false);
       toast.success("Categoria creata con successo");
       router.refresh();
-      
+
       // Reset new category form
       setNewCategory({
         name: "",
@@ -273,7 +243,7 @@ export function CategoriesManager({
       toast.error("È necessario inserire un nome per la sottocategoria");
       return;
     }
-    
+
     setIsSubmitting(true);
     try {
       // Create subcategory structure
@@ -287,26 +257,14 @@ export function CategoriesManager({
         order: 0,
         isDeleted: false
       };
-      
-      const response = await fetch('/api/settings/categories', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(subcategoryData),
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Si è verificato un errore durante la creazione della sottocategoria');
-      }
-      
+
+      const response = await axios.post('/api/settings/categories', subcategoryData);
+
       // Add the new subcategory to local state if returned
-      if (data.category) {
-        setCategories(prev => [...prev, data.category]);
+      if (response.data.category) {
+        setCategories(prev => [...prev, response.data.category]);
       }
-      
+
       setIsCreateSubcategoryDialogOpen(false);
       setNewSubcategory("");
       toast.success("Sottocategoria creata con successo");
@@ -346,7 +304,7 @@ export function CategoriesManager({
           Nuova Categoria
         </Button>
       </div>
-      
+
       <Tabs defaultValue="all" value={activeTab} onValueChange={(value) => setActiveTab(value as "all" | "income" | "expense")}>
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="all">Tutte</TabsTrigger>
@@ -359,9 +317,9 @@ export function CategoriesManager({
             Spese
           </TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="all" className="mt-4">
-          <CategoriesList 
+          <CategoriesList
             categories={hierarchicalCategories}
             onEdit={(category) => {
               setSelectedCategory(category);
@@ -377,9 +335,9 @@ export function CategoriesManager({
             }}
           />
         </TabsContent>
-        
+
         <TabsContent value="income" className="mt-4">
-          <CategoriesList 
+          <CategoriesList
             categories={hierarchicalCategories.filter(cat => cat.type === "income")}
             onEdit={(category) => {
               setSelectedCategory(category);
@@ -395,9 +353,9 @@ export function CategoriesManager({
             }}
           />
         </TabsContent>
-        
+
         <TabsContent value="expense" className="mt-4">
-          <CategoriesList 
+          <CategoriesList
             categories={hierarchicalCategories.filter(cat => cat.type === "expense")}
             onEdit={(category) => {
               setSelectedCategory(category);
@@ -414,7 +372,7 @@ export function CategoriesManager({
           />
         </TabsContent>
       </Tabs>
-      
+
       {/* Edit Category Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="sm:max-w-md">
@@ -424,7 +382,7 @@ export function CategoriesManager({
               Aggiorna i dettagli della categoria selezionata.
             </DialogDescription>
           </DialogHeader>
-          
+
           {selectedCategory && (
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
@@ -445,7 +403,7 @@ export function CategoriesManager({
                   <p className="text-xs text-destructive">Il nome della categoria è obbligatorio</p>
                 )}
               </div>
-              
+
               <div className="grid grid-cols-2 gap-4">
                 {/* Icon Selection */}
                 <div className="space-y-2">
@@ -497,7 +455,7 @@ export function CategoriesManager({
                     </SelectContent>
                   </Select>
                 </div>
-                
+
                 {/* Color Selection */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Colore</label>
@@ -509,10 +467,10 @@ export function CategoriesManager({
                   />
                 </div>
               </div>
-              
+
               {/* Preview */}
               <div className="border rounded-lg p-3 bg-muted/10">
-                <CategoryDisplay 
+                <CategoryDisplay
                   category={{
                     name: selectedCategory.name,
                     type: selectedCategory.type as CategoryType,
@@ -525,13 +483,13 @@ export function CategoriesManager({
               </div>
             </div>
           )}
-          
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
               Annulla
             </Button>
-            <Button 
-              disabled={isSubmitting || !selectedCategory?.name} 
+            <Button
+              disabled={isSubmitting || !selectedCategory?.name}
               onClick={handleEditCategory}
             >
               {isSubmitting ? "Salvando..." : "Salva Modifiche"}
@@ -539,7 +497,7 @@ export function CategoriesManager({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      
+
       {/* Delete Category Confirmation */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
@@ -552,7 +510,7 @@ export function CategoriesManager({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isSubmitting}>Annulla</AlertDialogCancel>
-            <AlertDialogAction 
+            <AlertDialogAction
               onClick={() => handleDeleteCategory()}
               disabled={isSubmitting}
               className="bg-red-500 text-white hover:bg-red-600"
@@ -562,7 +520,7 @@ export function CategoriesManager({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      
+
       {/* Create Category Dialog */}
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
         <DialogContent className="sm:max-w-md">
@@ -572,7 +530,7 @@ export function CategoriesManager({
               Crea una nuova categoria per organizzare le tue transazioni.
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <label htmlFor="newName" className="text-sm font-medium">Nome</label>
@@ -593,15 +551,15 @@ export function CategoriesManager({
                 <p className="text-xs text-destructive">Il nome della categoria è obbligatorio</p>
               )}
             </div>
-            
+
             <div className="grid gap-2">
               <label htmlFor="type" className="text-sm font-medium">Tipo</label>
               <div className="flex gap-4">
                 <Button
                   type="button"
                   variant={newCategory.type === "income" ? "default" : "outline"}
-                  onClick={() => setNewCategory({ 
-                    ...newCategory, 
+                  onClick={() => setNewCategory({
+                    ...newCategory,
                     type: "income",
                     color: "#4CAF50",
                     icon: "trending-up"
@@ -614,8 +572,8 @@ export function CategoriesManager({
                 <Button
                   type="button"
                   variant={newCategory.type === "expense" ? "default" : "outline"}
-                  onClick={() => setNewCategory({ 
-                    ...newCategory, 
+                  onClick={() => setNewCategory({
+                    ...newCategory,
                     type: "expense",
                     color: "#F44336",
                     icon: "shopping-bag"
@@ -627,7 +585,7 @@ export function CategoriesManager({
                 </Button>
               </div>
             </div>
-            
+
             <div className="grid grid-cols-2 gap-4">
               {/* Icon Selection */}
               <div className="space-y-2">
@@ -679,7 +637,7 @@ export function CategoriesManager({
                   </SelectContent>
                 </Select>
               </div>
-              
+
               {/* Color Selection */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">Colore</label>
@@ -691,10 +649,10 @@ export function CategoriesManager({
                 />
               </div>
             </div>
-            
+
             {/* Preview */}
             <div className="border rounded-lg p-3 bg-muted/10">
-              <CategoryDisplay 
+              <CategoryDisplay
                 category={{
                   name: newCategory.name || (newCategory.type === "income" ? "Nuova Entrata" : "Nuova Spesa"),
                   type: newCategory.type as CategoryType,
@@ -705,7 +663,7 @@ export function CategoriesManager({
               />
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
               Annulla
@@ -716,7 +674,7 @@ export function CategoriesManager({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      
+
       {/* Create Subcategory Dialog */}
       <Dialog open={isCreateSubcategoryDialogOpen} onOpenChange={setIsCreateSubcategoryDialogOpen}>
         <DialogContent className="sm:max-w-md">
@@ -726,7 +684,7 @@ export function CategoriesManager({
               Aggiungi una sottocategoria a &quot;{parentCategoryForSub?.name}&quot;.
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <label htmlFor="subName" className="text-sm font-medium">Nome Sottocategoria</label>
@@ -737,12 +695,12 @@ export function CategoriesManager({
                 placeholder="Inserisci il nome della sottocategoria..."
               />
             </div>
-            
+
             {/* Parent Category Preview */}
             {parentCategoryForSub && (
               <div className="border rounded-lg p-3 bg-muted/10">
                 <div className="text-xs text-muted-foreground mb-2">Categoria principale:</div>
-                <CategoryDisplay 
+                <CategoryDisplay
                   category={{
                     name: parentCategoryForSub.name,
                     type: parentCategoryForSub.type as CategoryType,
@@ -754,7 +712,7 @@ export function CategoriesManager({
               </div>
             )}
           </div>
-          
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsCreateSubcategoryDialogOpen(false)}>
               Annulla
@@ -794,7 +752,7 @@ function CategoriesList({ categories, onEdit, onDelete, onAddSubcategory }: Cate
   return (
     <div className="space-y-2">
       {categories.map((category) => (
-        <div 
+        <div
           key={category.id}
           className={cn(
             "group relative p-3 border rounded-lg transition-all hover:shadow-sm",
@@ -802,7 +760,7 @@ function CategoriesList({ categories, onEdit, onDelete, onAddSubcategory }: Cate
           )}
         >
           <div className="flex items-center justify-between">
-            <CategoryDisplay 
+            <CategoryDisplay
               category={{
                 name: category.name,
                 type: category.type as CategoryType,
@@ -812,14 +770,14 @@ function CategoriesList({ categories, onEdit, onDelete, onAddSubcategory }: Cate
               }}
               showSubcategories={false}
             />
-            
+
             <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button 
-                      variant="outline" 
-                      size="icon" 
+                    <Button
+                      variant="outline"
+                      size="icon"
                       className="h-8 w-8"
                       onClick={() => onAddSubcategory(category)}
                     >
@@ -831,19 +789,19 @@ function CategoriesList({ categories, onEdit, onDelete, onAddSubcategory }: Cate
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
-              
-              <Button 
-                variant="ghost" 
-                size="icon" 
+
+              <Button
+                variant="ghost"
+                size="icon"
                 className="h-8 w-8"
                 onClick={() => onEdit(category)}
               >
                 <Edit className="h-4 w-4" />
               </Button>
-              
-              <Button 
-                variant="ghost" 
-                size="icon" 
+
+              <Button
+                variant="ghost"
+                size="icon"
                 className="h-8 w-8 text-destructive hover:text-destructive/90 hover:bg-destructive/10"
                 onClick={() => onDelete(category)}
               >
@@ -851,7 +809,7 @@ function CategoriesList({ categories, onEdit, onDelete, onAddSubcategory }: Cate
               </Button>
             </div>
           </div>
-          
+
           {/* Subcategories */}
           {category.subcategories && category.subcategories.length > 0 && (
             <div className="mt-2 pt-2 pl-4 border-t border-dashed">
@@ -876,18 +834,18 @@ function CategoriesList({ categories, onEdit, onDelete, onAddSubcategory }: Cate
                   <div key={subcat.id} className="flex items-center justify-between border rounded p-2 bg-muted/30 group/subcat">
                     <span className="text-sm">{subcat.name}</span>
                     <div className="flex items-center gap-1 opacity-0 group-hover/subcat:opacity-100 transition-opacity">
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         className="h-6 w-6"
                         onClick={() => onEdit(subcat)}
                       >
                         <Edit className="h-3 w-3" />
                       </Button>
-                      
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
+
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         className="h-6 w-6 text-destructive hover:text-destructive/90 hover:bg-destructive/10"
                         onClick={() => onDelete(subcat)}
                       >
