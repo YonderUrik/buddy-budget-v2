@@ -65,23 +65,23 @@ export async function POST(request: Request) {
     }
 
     // Aggiorna le impostazioni dell'utente
-    await prisma.user.update({
-      where: {
-        id: user.id,
-      },
-      data: {
-        settings: {
-          language
+    const result = await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: {
+          id: user.id,
         },
-        primaryCurrency,
-        hasCompletedOnboarding: true,
-      },
-    });
+        data: {
+          settings: {
+            language
+          },
+          primaryCurrency,
+          hasCompletedOnboarding: true,
+        },
+      });
 
-    // Crea gli account di liquidità
-    for (const account of liquidityAccounts) {
-      await prisma.$transaction(async (tx) => {
-        const createdAccount = await prisma.liquidityAccount.create({
+      // Crea gli account di liquidità
+      for (const account of liquidityAccounts) {
+        const createdAccount = await tx.liquidityAccount.create({
           data: {
             userId: user.id,
             name: account.name,
@@ -166,45 +166,50 @@ export async function POST(request: Request) {
           });
         }
 
-      })
-    }
+      }
 
-    // Crea le categorie personalizzate se fornite
-    if (categories) {
-      for (const category of categories) {
-        // Crea la categoria principale
-        const createdCategory = await prisma.category.create({
-          data: {
-            userId: user.id,
-            name: category.name,
-            type: category.type,
-            icon: category.icon,
-            color: category.color,
-            level: 0,
-          },
-        });
+      // Crea le categorie personalizzate se fornite
+      if (categories) {
+        for (const category of categories) {
+          // Crea la categoria principale
+          const createdCategory = await tx.category.create({
+            data: {
+              userId: user.id,
+              name: category.name,
+              type: category.type,
+              icon: category.icon,
+              color: category.color,
+              level: 0,
+            },
+          });
 
-        // Crea le sottocategorie se presenti
-        if (category.subcategories && category.subcategories.length > 0) {
-          for (const subcategory of category.subcategories) {
-            await prisma.category.create({
-              data: {
-                userId: user.id,
-                name: subcategory.name,
-                type: category.type, // Eredita il tipo dalla categoria principale
-                icon: category.icon, // Eredita l'icona dalla categoria principale
-                color: category.color, // Eredita il colore dalla categoria principale
-                parentId: createdCategory.id,
-                level: 1,
-              },
-            });
+          // Crea le sottocategorie se presenti
+          if (category.subcategories && category.subcategories.length > 0) {
+            for (const subcategory of category.subcategories) {
+              await tx.category.create({
+                data: {
+                  userId: user.id,
+                  name: subcategory.name,
+                  type: category.type, // Eredita il tipo dalla categoria principale
+                  icon: category.icon, // Eredita l'icona dalla categoria principale
+                  color: category.color, // Eredita il colore dalla categoria principale
+                  parentId: createdCategory.id,
+                  level: 1,
+                },
+              });
+            }
           }
         }
+      } else {
+        console.warn("No categories provided")
       }
-    } else {
-      console.warn("No categories provided")
-    }
 
+      return { success: true };
+    });
+
+    if (!result.success) {
+      throw new Error("Errore durante l'onboarding");
+    }
 
     return NextResponse.json(
       { message: "Onboarding completato con successo" },

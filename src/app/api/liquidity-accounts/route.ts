@@ -52,6 +52,17 @@ export async function POST(request: NextRequest) {
     // Override userId with the authenticated user's ID
     data.userId = userId;
 
+    // Validate and ensure data respects the LiquidityAccount model
+    if (!data.name || !data.type || typeof data.balance !== 'number' || data.balance < 0) {
+      return NextResponse.json({ error: 'Invalid data format' }, { status: 400 });
+    }
+
+    // Ensure type is one of the allowed values
+    const allowedTypes = ['checking', 'savings', 'cash', 'other'];
+    if (!allowedTypes.includes(data.type)) {
+      return NextResponse.json({ error: 'Invalid account type' }, { status: 400 });
+    }
+
     // Use a transaction to ensure data consistency across related operations
     const result = await prisma.$transaction(async (tx) => {
       // Create the liquidity account
@@ -94,6 +105,7 @@ export async function POST(request: NextRequest) {
           isDeleted: false,
         },
       });
+      
       const liquidityTotal = liquidityAccounts.reduce(
         (sum, acc) => sum + acc.balance,
         0

@@ -12,14 +12,14 @@ export async function GET(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session || !session.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const userId = session.user.id;
-    const { id } = params;
-    
+    const { id } = await params;
+
     const account = await prisma.liquidityAccount.findUnique({
       where: {
         id,
@@ -48,25 +48,28 @@ export async function PATCH(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session || !session.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const userId = session.user.id;
     const primaryCurrency = session.user.primaryCurrency
-    const { id } = params;
+
+    const { id } = await params;
     const data = await request.json();
-    
-    // Remove any fields that shouldn't be updated by the client
-    delete data.id;
-    delete data.userId;
-    delete data.createdAt;
-    delete data.isDeleted;
-    delete data.deletedAt;
-    
+
+    // Keep only the keys name, type, balance, isActive
+    const allowedKeys = ['name', 'type', 'balance', 'isActive'];
+    Object.keys(data).forEach(key => {
+      if (!allowedKeys.includes(key)) {
+        delete data[key];
+      }
+    });
+
     // Use a transaction to ensure data consistency across related operations
     const result = await prisma.$transaction(async (tx) => {
+
       // First check if the account exists and belongs to the user
       const existingAccount = await tx.liquidityAccount.findUnique({
         where: {
@@ -89,7 +92,7 @@ export async function PATCH(
       });
 
       // If balance was updated, create a new AssetValuation record
-      if (data.balance !== undefined && data.balance !== existingAccount.balance) {
+      if (data.balance !== existingAccount.balance) {
         await tx.assetValuation.create({
           data: {
             assetId: id,
@@ -105,7 +108,7 @@ export async function PATCH(
         // Update WealthSnapshot
         const today = new Date();
         today.setHours(0, 0, 0, 0); // Reset to beginning of day for consistent snapshots
-        
+
         // Get existing snapshot for today
         const existingSnapshot = await tx.wealthSnapshot.findFirst({
           where: {
@@ -135,8 +138,8 @@ export async function PATCH(
             where: { id: existingSnapshot.id },
             data: {
               liquidityTotal,
-              netWorth: 
-                liquidityTotal + 
+              netWorth:
+                liquidityTotal +
                 existingSnapshot.marketInvestmentsTotal +
                 existingSnapshot.cryptoInvestmentsTotal +
                 existingSnapshot.retirementInvestmentsTotal +
@@ -171,11 +174,11 @@ export async function PATCH(
     return NextResponse.json(result);
   } catch (error) {
     console.error('Error updating liquidity account:', error);
-    
+
     if ((error as Error).message === 'Account not found') {
       return NextResponse.json({ error: 'Account not found' }, { status: 404 });
     }
-    
+
     return NextResponse.json(
       { error: 'Failed to update liquidity account' },
       { status: 500 }
@@ -190,7 +193,7 @@ export async function DELETE(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session || !session.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -198,7 +201,7 @@ export async function DELETE(
     const userId = session.user.id;
     const primaryCurrency = session.user.primaryCurrency
     const { id } = params;
-    
+
     // Use a transaction to ensure data consistency across related operations
     const result = await prisma.$transaction(async (tx) => {
       // First check if the account exists and belongs to the user
@@ -213,32 +216,23 @@ export async function DELETE(
         throw new Error('Account not found');
       }
 
-      // Soft delete the account
-      const deletedAccount = await tx.liquidityAccount.update({
+      // Hard delete the account
+      const deletedAccount = await tx.liquidityAccount.delete({
         where: { id },
-        data: {
-          isDeleted: true,
-          deletedAt: new Date(),
-        },
       });
 
-      // Soft delete associated asset valuations
-      await tx.assetValuation.updateMany({
+      // Hard delete associated asset valuations
+      await tx.assetValuation.deleteMany({
         where: {
           assetId: id,
           assetType: 'liquidity',
-          isDeleted: false,
-        },
-        data: {
-          isDeleted: true,
-          deletedAt: new Date(),
         },
       });
 
       // Update WealthSnapshot
       const today = new Date();
       today.setHours(0, 0, 0, 0); // Reset to beginning of day for consistent snapshots
-      
+
       // Get existing snapshot for today
       const existingSnapshot = await tx.wealthSnapshot.findFirst({
         where: {
@@ -257,6 +251,7 @@ export async function DELETE(
           isDeleted: false,
         },
       });
+      
       const liquidityTotal = liquidityAccounts.reduce(
         (sum, acc) => sum + acc.balance,
         0
@@ -268,8 +263,8 @@ export async function DELETE(
           where: { id: existingSnapshot.id },
           data: {
             liquidityTotal,
-            netWorth: 
-              liquidityTotal + 
+            netWorth:
+              liquidityTotal +
               existingSnapshot.marketInvestmentsTotal +
               existingSnapshot.cryptoInvestmentsTotal +
               existingSnapshot.retirementInvestmentsTotal +
@@ -303,11 +298,11 @@ export async function DELETE(
     return NextResponse.json(result);
   } catch (error) {
     console.error('Error deleting liquidity account:', error);
-    
+
     if ((error as Error).message === 'Account not found') {
       return NextResponse.json({ error: 'Account not found' }, { status: 404 });
     }
-    
+
     return NextResponse.json(
       { error: 'Failed to delete liquidity account' },
       { status: 500 }

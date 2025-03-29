@@ -50,6 +50,19 @@ export async function POST(request: Request) {
     
     const categoryData = await request.json();
     const { name, type, icon, color, parentId, level, order } = categoryData;
+
+    if (parentId) {
+      const parentCategory = await prisma.category.findUnique({
+        where: { id: parentId },
+      });
+
+      if (!parentCategory || parentCategory.parentId) {
+        return NextResponse.json(
+          { error: "Il parentId specificato non è una categoria senza parentId" },
+          { status: 400 }
+        );
+      }
+    }
     
     // Create a new category
     const category = await prisma.category.create({

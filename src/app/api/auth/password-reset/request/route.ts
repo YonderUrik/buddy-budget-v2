@@ -14,14 +14,14 @@ const requestSchema = z.object({
 });
 
 // Funzione per validare e costruire l'indirizzo email del mittente
-function getSenderEmail(mail_name : string): string {
+function getSenderEmail(mail_name: string): string {
   if (!APP_DOMAIN) {
     throw new Error("APP_DOMAIN non è definito nella configurazione");
   }
 
   // Rimuovi eventuali spazi e caratteri non validi
   const cleanDomain = APP_DOMAIN.trim().toLowerCase();
-  
+
   // Valida il dominio
   if (!/^[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9](?:\.[a-zA-Z]{2,})+$/.test(cleanDomain)) {
     throw new Error("Il dominio configurato non è valido");
@@ -57,25 +57,34 @@ export async function POST(request: Request) {
     const expires = new Date();
     expires.setMinutes(expires.getMinutes() + 30);
 
-    // Elimina eventuali token esistenti per l'utente
-    await prisma.passwordResetToken.deleteMany({
-      where: {
-        userId: user.id,
-      },
+    const result = await prisma.$transaction(async (tx) => {
+
+      // Elimina eventuali token esistenti per l'utente
+      await tx.passwordResetToken.deleteMany({
+        where: {
+          userId: user.id,
+        },
+      });
+
+      // Crea un nuovo token di reset
+      await tx.passwordResetToken.create({
+        data: {
+          userId: user.id,
+          token,
+          expires,
+        },
+      });
+
+      return { success: true };
     });
 
-    // Crea un nuovo token di reset
-    await prisma.passwordResetToken.create({
-      data: {
-        userId: user.id,
-        token,
-        expires,
-      },
-    });
+    if (!result.success) {
+      throw new Error("Errore durante la richiesta di reset della password");
+    }
 
     // Ottieni e valida l'indirizzo email del mittente
     const senderEmail = getSenderEmail("noreply");
-    
+
     // TODO : Migliorare l'estetica dell'html
     await resend.emails.send({
       from: senderEmail,

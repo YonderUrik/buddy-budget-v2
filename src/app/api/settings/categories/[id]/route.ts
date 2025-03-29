@@ -21,7 +21,6 @@ export async function PUT(request: Request, { params }: Props) {
 
     const { id } = params;
     const categoryData = await request.json();
-    console.log("categoryData", categoryData)
     const { name, icon, color, subcategories } = categoryData;
 
     // Ensure the category belongs to the user
@@ -39,38 +38,45 @@ export async function PUT(request: Request, { params }: Props) {
       );
     }
 
-    // Update category
-    const updatedCategory = await prisma.category.update({
-      where: { id },
-      data: {
-        name,
-        icon,
-        color,
-      },
-    });
+    const result = await prisma.$transaction(async (tx) => {
 
-    if (subcategories) {
-      for (const subcategory of subcategories) {
-        if (!subcategory.id) {
-          // Add new subcategory
-          await prisma.category.create({
-            data: { ...subcategory, userId: session?.user?.id }
-          });
-        } else {
-          // Update existing subcategory
-          await prisma.category.update({
-            where: { id: subcategory.id },
-            data: {
-              name: subcategory.name,
-            },
-          });
+      // Update category
+      const updatedCategory = await tx.category.update({
+        where: { id },
+        data: {
+          name,
+          icon,
+          color,
+        },
+      });
+
+      if (subcategories) {
+        for (const subcategory of subcategories) {
+          if (!subcategory.id) {
+            // Add new subcategory
+            await tx.category.create({
+              data: { ...subcategory, userId: session?.user?.id }
+            });
+          } else {
+            // Update existing subcategory
+            await tx.category.update({
+              where: { id: subcategory.id },
+              data: {
+                name: subcategory.name,
+              },
+            });
+          }
         }
       }
+
+      return { success: true, category: updatedCategory };
+    });
+
+    if (!result.success) {
+      throw new Error("Errore durante l'aggiornamento della categoria");
     }
 
-
-
-    return NextResponse.json({ success: true, category: updatedCategory });
+    return NextResponse.json(result);
   } catch (error) {
     console.error("Error updating category:", error);
     return NextResponse.json(
@@ -109,16 +115,26 @@ export async function DELETE(request: Request, { params }: Props) {
       );
     }
 
-    // Soft delete the category
-    await prisma.category.update({
-      where: { id },
-      data: {
-        isDeleted: true,
-        deletedAt: new Date(),
-      },
+    const result = await prisma.$transaction(async (tx) => {
+
+      // Delete all child categories
+      await tx.category.deleteMany({
+        where: { parentId: id },
+      });
+
+      // Hard delete the category
+      await tx.category.delete({
+        where: { id },
+      });
+
+      return { success: true };
     });
 
-    return NextResponse.json({ success: true });
+    if (!result.success) {
+      throw new Error("Errore durante l'eliminazione della categoria");
+    }
+
+    return NextResponse.json(result);
   } catch (error) {
     console.error("Error deleting category:", error);
     return NextResponse.json(

@@ -50,22 +50,30 @@ export async function POST(request: Request) {
     // Hash della nuova password
     const hashedPassword = await hash(password, 10);
 
-    // Aggiorna la password dell'utente
-    await prisma.user.update({
-      where: {
-        id: user.id,
-      },
-      data: {
-        password: hashedPassword,
-      },
+    const result = await prisma.$transaction(async (tx) => {
+      // Aggiorna la password dell'utente
+      await tx.user.update({
+        where: {
+          id: user.id,
+        },
+        data: {
+          password: hashedPassword,
+        },
+      });
+
+      // Elimina il token di reset
+      await tx.passwordResetToken.delete({
+        where: {
+          id: resetToken.id,
+        },
+      });
+
+      return { success: true };
     });
 
-    // Elimina il token di reset
-    await prisma.passwordResetToken.delete({
-      where: {
-        id: resetToken.id,
-      },
-    });
+    if (!result.success) {
+      throw new Error("Errore durante il reset della password");
+    }
 
     return NextResponse.json(
       { message: "Password reimpostata con successo" },
@@ -73,14 +81,14 @@ export async function POST(request: Request) {
     );
   } catch (error) {
     console.error("Errore durante il reset della password:", error);
-    
+
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { message: "Dati non validi", errors: error.errors },
         { status: 400 }
       );
     }
-    
+
     return NextResponse.json(
       { message: "Si è verificato un errore durante il reset della password" },
       { status: 500 }
