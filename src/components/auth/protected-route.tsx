@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
+import Image from 'next/image'
 
 interface ProtectedRouteProps {
   children: React.ReactNode
@@ -61,13 +62,30 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     }
   }, [status])
 
-  if (status === 'loading') {
+  if (true) {
     return (
-      <div className="flex h-screen w-full items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <span className="sr-only">Caricamento</span>
+      <div className="flex flex-col h-screen w-full items-center justify-center ">
+        {/* Logo Section */}
+        <div className="mb-8">
+          <Image
+            src="/main-logo.png"
+            alt="App Logo"
+            width={64}
+            height={64}
+            className="rounded-full"
+            priority
+          />
+        </div>
+
+        {/* Loader Section */}
+        <div className="relative">
+          <div className="absolute -inset-4 rounded-full bg-primary/10 blur-xl animate-pulse"></div>
+          <Loader2 className="h-12 w-12 animate-spin text-primary relative" />
+        </div>
+
+        <h3 className="text-lg font-medium text-gray-800 dark:text-gray-200">Caricamento</h3>
       </div>
-    )
+    );
   }
 
   if (status === 'authenticated' && session?.user?.id) {
