@@ -1,20 +1,18 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
+
 datasource db {
   provider = "mongodb"
   url      = env("DATABASE_URL")
 }
+
 // Modelli di Dati
 model User {
   id                     String                  @id @default(auto()) @map("_id") @db.ObjectId
   name                   String
   email                  String                  @unique
   password               String // Hashed password
-  settings               Json? // {language : 'it'}
   primaryCurrency        String                  @default("EUR")
   isActive               Boolean                 @default(true)
   createdAt              DateTime                @default(now())
@@ -32,6 +30,7 @@ model User {
   investmentTransactions InvestmentTransaction[]
   passwordResetTokens    PasswordResetToken[]
 }
+
 model LiquidityAccount {
   id        String    @id @default(auto()) @map("_id") @db.ObjectId
   userId    String    @db.ObjectId
@@ -45,38 +44,42 @@ model LiquidityAccount {
   deletedAt DateTime?
 
   // Relazioni
-  user                  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  transactions          Transaction[]
-  recurringTransactions RecurringTransaction[]
-  assetValuations       AssetValuation[]
+  user                    User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceTransactions      Transaction[]          @relation("sourceAccount")
+  destinationTransactions Transaction[]          @relation("destinationAccount")
+  recurringTransactions   RecurringTransaction[]
+  assetValuations         AssetValuation[]
 }
-model Transaction {
-  id              String    @id @default(auto()) @map("_id") @db.ObjectId
-  userId          String    @db.ObjectId
-  accountId       String    @db.ObjectId
-  date            DateTime
-  amount          Float
-  currency        String    @default("EUR")
-  convertedAmount Float? // Importo nella valuta primaria dell'utente
-  type            String // "income", "expense", "transfer"
-  categoryId      String?   @db.ObjectId
-  description     String?
-  isRecurring     Boolean   @default(false)
-  recurringId     String?   @db.ObjectId
-  budgetId        String?   @db.ObjectId
-  tags            String[]
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  isDeleted       Boolean   @default(false)
-  deletedAt       DateTime?
 
-  // Relazioni
-  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  account              LiquidityAccount      @relation(fields: [accountId], references: [id], onDelete: Cascade)
+model Transaction {
+  id                   String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId               String    @db.ObjectId
+  accountId            String    @db.ObjectId
+  destinationAccountId String?   @db.ObjectId
+  date                 DateTime
+  amount               Float
+  currency             String    @default("EUR")
+  type                 String // "income", "expense", "transfer"
+  categoryId           String?   @db.ObjectId
+  description          String?
+  isRecurring          Boolean   @default(false)
+  recurringId          String?   @db.ObjectId
+  budgetId             String?   @db.ObjectId
+  tags                 String[]
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  isDeleted            Boolean   @default(false)
+  deletedAt            DateTime?
+
+  // Relations
+  user                 User                  @relation(fields: [userId], references: [id], onDelete: Restrict)
+  account              LiquidityAccount      @relation(name: "sourceAccount", fields: [accountId], references: [id], onDelete: Restrict)
+  destinationAccount   LiquidityAccount?     @relation(name: "destinationAccount", fields: [destinationAccountId], references: [id], onDelete: Restrict)
   category             Category?             @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   recurringTransaction RecurringTransaction? @relation(fields: [recurringId], references: [id], onDelete: Cascade)
   budget               Budget?               @relation(fields: [budgetId], references: [id], onDelete: Cascade)
 }
+
 model Category {
   id        String    @id @default(auto()) @map("_id") @db.ObjectId
   userId    String    @db.ObjectId
@@ -100,6 +103,7 @@ model Category {
   recurringTransactions RecurringTransaction[]
   budgetCategories      BudgetCategory[]
 }
+
 model RecurringTransaction {
   id             String    @id @default(auto()) @map("_id") @db.ObjectId
   userId         String    @db.ObjectId
@@ -125,6 +129,7 @@ model RecurringTransaction {
   category     Category?        @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   transactions Transaction[]
 }
+
 model Budget {
   id                   String    @id @default(auto()) @map("_id") @db.ObjectId
   userId               String    @db.ObjectId
@@ -146,6 +151,7 @@ model Budget {
   budgetCategories BudgetCategory[]
   transactions     Transaction[]
 }
+
 // Modello di relazione molti-a-molti tra Budget e Category
 model BudgetCategory {
   id         String @id @default(auto()) @map("_id") @db.ObjectId
@@ -158,6 +164,7 @@ model BudgetCategory {
 
   @@unique([budgetId, categoryId])
 }
+
 model Investment {
   id                   String    @id @default(auto()) @map("_id") @db.ObjectId
   userId               String    @db.ObjectId
@@ -184,6 +191,7 @@ model Investment {
   assetValuations        AssetValuation[]
   investmentTransactions InvestmentTransaction[]
 }
+
 model MarketInvestment {
   id            String    @id @default(auto()) @map("_id") @db.ObjectId
   investmentId  String    @unique @db.ObjectId
@@ -205,6 +213,7 @@ model MarketInvestment {
   // Relazioni
   investment Investment @relation(fields: [investmentId], references: [id], onDelete: Cascade)
 }
+
 model CryptoInvestment {
   id            String    @id @default(auto()) @map("_id") @db.ObjectId
   investmentId  String    @unique @db.ObjectId
@@ -225,6 +234,7 @@ model CryptoInvestment {
   // Relazioni
   investment Investment @relation(fields: [investmentId], references: [id], onDelete: Cascade)
 }
+
 model RetirementInvestment {
   id                 String    @id @default(auto()) @map("_id") @db.ObjectId
   investmentId       String    @unique @db.ObjectId
@@ -244,6 +254,7 @@ model RetirementInvestment {
   // Relazioni
   investment Investment @relation(fields: [investmentId], references: [id], onDelete: Cascade)
 }
+
 model RealEstateInvestment {
   id               String    @id @default(auto()) @map("_id") @db.ObjectId
   investmentId     String    @unique @db.ObjectId
@@ -265,6 +276,7 @@ model RealEstateInvestment {
   investment Investment @relation(fields: [investmentId], references: [id], onDelete: Cascade)
   mortgage   Mortgage?  @relation(fields: [mortgageId], references: [id], onDelete: SetNull)
 }
+
 model Mortgage {
   id                String    @id @default(auto()) @map("_id") @db.ObjectId
   userId            String    @db.ObjectId
@@ -287,6 +299,7 @@ model Mortgage {
   user                  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
   realEstateInvestments RealEstateInvestment[]
 }
+
 model InvestmentTransaction {
   id           String   @id @default(auto()) @map("_id") @db.ObjectId
   userId       String   @db.ObjectId
@@ -314,6 +327,7 @@ model InvestmentTransaction {
   user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   investment Investment @relation(fields: [investmentId], references: [id], onDelete: Cascade)
 }
+
 model AssetValuation {
   id        String    @id @default(auto()) @map("_id") @db.ObjectId
   assetId   String    @db.ObjectId
@@ -329,6 +343,7 @@ model AssetValuation {
   liquidityAccount LiquidityAccount? @relation(fields: [assetId], references: [id], onDelete: Cascade)
   investment       Investment?       @relation(fields: [assetId], references: [id], onDelete: Cascade)
 }
+
 model WealthSnapshot {
   id                         String    @id @default(auto()) @map("_id") @db.ObjectId
   userId                     String    @db.ObjectId
@@ -348,6 +363,7 @@ model WealthSnapshot {
   // Relazioni
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
+
 model ExchangeRate {
   id           String   @id @default(auto()) @map("_id") @db.ObjectId
   fromCurrency String
@@ -360,6 +376,7 @@ model ExchangeRate {
 
   @@unique([fromCurrency, toCurrency, date])
 }
+
 model PasswordResetToken {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   userId    String   @db.ObjectId

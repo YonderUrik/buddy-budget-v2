@@ -83,68 +83,12 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // Update or create WealthSnapshot
-      const today = new Date();
-      today.setHours(0, 0, 0, 0); // Reset to beginning of day for consistent snapshots
+      await updateWealthSnapshot(new Date(), userId, primaryCurrency, tx);
 
-      // Get existing snapshot for today
-      const existingSnapshot = await tx.wealthSnapshot.findFirst({
-        where: {
-          userId,
-          date: {
-            gte: today,
-            lt: new Date(today.getTime() + 24 * 60 * 60 * 1000), // Next day
-          },
-        },
-      });
 
-      // Calculate total liquidity
-      const liquidityAccounts = await tx.liquidityAccount.findMany({
-        where: {
-          userId,
-          isDeleted: false,
-        },
-      });
-      
-      const liquidityTotal = liquidityAccounts.reduce(
-        (sum, acc) => sum + acc.balance,
-        0
-      );
 
-      if (existingSnapshot) {
-        // Update existing snapshot
-        await tx.wealthSnapshot.update({
-          where: { id: existingSnapshot.id },
-          data: {
-            liquidityTotal,
-            netWorth:
-              liquidityTotal +
-              existingSnapshot.marketInvestmentsTotal +
-              existingSnapshot.cryptoInvestmentsTotal +
-              existingSnapshot.retirementInvestmentsTotal +
-              existingSnapshot.realEstateInvestmentsTotal -
-              existingSnapshot.liabilitiesTotal,
-          },
-        });
-      } else {
-        // Create new snapshot
-        await tx.wealthSnapshot.create({
-          data: {
-            userId,
-            date: today,
-            currency: primaryCurrency,
-            liquidityTotal,
-            marketInvestmentsTotal: 0,
-            cryptoInvestmentsTotal: 0,
-            retirementInvestmentsTotal: 0,
-            realEstateInvestmentsTotal: 0,
-            liabilitiesTotal: 0,
-            netWorth: liquidityTotal, // Initially just the liquidity
-            createdAt: new Date(),
-            isDeleted: false,
-          },
-        });
-      }
+
+
 
       return account;
     });
@@ -157,4 +101,69 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-} 
+}
+
+async function updateWealthSnapshot(date: Date, userId: string, primaryCurrency: string, tx: PrismaClient) {
+  // Update or create WealthSnapshot
+
+  date.setHours(0, 0, 0, 0); // Reset to beginning of day for consistent snapshots
+
+  // Get existing snapshot for today
+  const existingSnapshot = await tx.wealthSnapshot.findFirst({
+    where: {
+      userId,
+      date: {
+        gte: date,
+        lt: new Date(date.getTime() + 24 * 60 * 60 * 1000), // Next day
+      },
+    },
+  });
+
+  // Calculate total liquidity
+  const liquidityAccounts = await tx.liquidityAccount.findMany({
+    where: {
+      userId,
+      isDeleted: false,
+    },
+  });
+
+  const liquidityTotal = liquidityAccounts.reduce(
+    (sum, acc) => sum + acc.balance,
+    0
+  );
+
+  if (existingSnapshot) {
+    // Update existing snapshot
+    await tx.wealthSnapshot.update({
+      where: { id: existingSnapshot.id },
+      data: {
+        liquidityTotal,
+        netWorth:
+          liquidityTotal +
+          existingSnapshot.marketInvestmentsTotal +
+          existingSnapshot.cryptoInvestmentsTotal +
+          existingSnapshot.retirementInvestmentsTotal +
+          existingSnapshot.realEstateInvestmentsTotal -
+          existingSnapshot.liabilitiesTotal,
+      },
+    });
+  } else {
+    // Create new snapshot
+    await tx.wealthSnapshot.create({
+      data: {
+        userId,
+        date: date,
+        currency: primaryCurrency,
+        liquidityTotal,
+        marketInvestmentsTotal: 0,
+        cryptoInvestmentsTotal: 0,
+        retirementInvestmentsTotal: 0,
+        realEstateInvestmentsTotal: 0,
+        liabilitiesTotal: 0,
+        netWorth: liquidityTotal, // Initially just the liquidity
+        createdAt: new Date(),
+        isDeleted: false,
+      },
+    });
+  }
+}
